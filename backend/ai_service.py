@@ -86,10 +86,12 @@ class AIService:
         - For budget adjustments:
           * If user says "tăng thêm", "thêm vào", "cộng thêm", "increase", "add" -> set adjustment to "increase"
           * If user says "giảm bớt", "giảm đi", "bớt đi", "decrease", "reduce" -> set adjustment to "decrease"
+          * If user says "giảm xuống còn", "chỉ còn", "set thành", "tăng lên mức", "đổi thành" -> set adjustment to null
         - Examples:
           * "35 triệu" -> 35000000
           * "tăng thêm 500k cho food" -> amount: 500000, category: Food, adjustment: "increase"
           * "giảm 200 ngàn budget shopping" -> amount: 200000, category: Shopping, adjustment: "decrease"
+          * "giảm food xuống còn 1 triệu" -> amount: 1000000, category: Food, adjustment: null
         - Return the full numeric value as a number.
         - For transactions, if relative dates (tomorrow, etc.) are used, calculate the exact date.
         - For budgets, if no month is specified, use the Current Month.

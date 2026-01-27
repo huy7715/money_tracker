@@ -65,7 +65,7 @@ class FinanceManager:
         current_budget = next((b for b in budgets if b.category.lower() == category.lower()), None)
         
         if current_budget:
-            new_limit = current_budget.monthly_limit + amount
+            new_limit = max(0, current_budget.monthly_limit + amount)
         else:
             # If no budget exists, treat adjustment as setting a new one (starting from 0)
             new_limit = max(0, amount)
