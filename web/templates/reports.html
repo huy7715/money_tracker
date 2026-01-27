@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monthly Reports - Money Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <header style="position: relative;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h1>📊 Monthly Reports</h1>
+                <a href="/"
+                    style="text-decoration: none; background: rgba(255,255,255,0.3); color: white; padding: 0.5rem 1rem; border-radius: 0.5rem; font-weight: 500; backdrop-filter: blur(5px);">
+                    ← Back to Home
+                </a>
+            </div>
+        </header>
+
+        <main>
+            <!-- Month Selector -->
+            <section
+                style="background: white; padding: 1.5rem; border-radius: 1rem; margin-bottom: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+                <div style="display: flex; gap: 1rem; align-items: center;">
+                    <label style="font-weight: 600;">Select Month:</label>
+                    <input type="month" id="month-selector"
+                        style="padding: 0.5rem; border-radius: 0.5rem; border: 2px solid #e5e7eb; outline: none; font-size: 1rem;">
+                    <button id="load-report-btn"
+                        style="background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); color: white; border: none; padding: 0.5rem 1.5rem; border-radius: 0.5rem; font-weight: 600; cursor: pointer;">
+                        Load Report
+                    </button>
+                </div>
+            </section>
+
+            <!-- Summary Cards -->
+            <div
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+                <div class="summary-card"
+                    style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 1.5rem; border-radius: 1rem; color: white; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                    <div style="font-size: 0.875rem; opacity: 0.9; margin-bottom: 0.5rem;">Total Income</div>
+                    <div id="total-income" style="font-size: 2rem; font-weight: 700;">0 ₫</div>
+                </div>
+                <div class="summary-card"
+                    style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); padding: 1.5rem; border-radius: 1rem; color: white; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                    <div style="font-size: 0.875rem; opacity: 0.9; margin-bottom: 0.5rem;">Total Expense</div>
+                    <div id="total-expense" style="font-size: 2rem; font-weight: 700;">0 ₫</div>
+                </div>
+                <div class="summary-card"
+                    style="background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); padding: 1.5rem; border-radius: 1rem; color: white; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                    <div style="font-size: 0.875rem; opacity: 0.9; margin-bottom: 0.5rem;">Net Savings</div>
+                    <div id="net-savings" style="font-size: 2rem; font-weight: 700;">0 ₫</div>
+                </div>
+                <div class="summary-card"
+                    style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding: 1.5rem; border-radius: 1rem; color: white; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                    <div style="font-size: 0.875rem; opacity: 0.9; margin-bottom: 0.5rem;">Transactions</div>
+                    <div id="transaction-count" style="font-size: 2rem; font-weight: 700;">0</div>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+                <!-- Category Breakdown -->
+                <section
+                    style="background: white; padding: 1.5rem; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+                    <h3 style="margin-bottom: 1rem;">Spending by Category</h3>
+                    <div style="position: relative; height: 300px;">
+                        <canvas id="categoryChart"></canvas>
+                    </div>
+                </section>
+
+                <!-- Top Categories -->
+                <section
+                    style="background: white; padding: 1.5rem; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+                    <h3 style="margin-bottom: 1rem;">Top Spending Categories</h3>
+                    <div id="top-categories" style="display: flex; flex-direction: column; gap: 0.75rem;">
+                        <!-- Top categories will be inserted here -->
+                    </div>
+                </section>
+            </div>
+
+            <!-- Transaction List -->
+            <section
+                style="background: white; padding: 1.5rem; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+                <h3 style="margin-bottom: 1rem;">Transactions This Month</h3>
+                <div id="monthly-transactions" style="max-height: 400px; overflow-y: auto;">
+                    <!-- Transactions will be inserted here -->
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        // Helper functions
+        function formatVND(num) {
+            if (!num && num !== 0) return '';
+            return Number(num).toLocaleString('vi-VN');
+        }
+
+        // Set default month to current month
+        const monthSelector = document.getElementById('month-selector');
+        const now = new Date();
+        monthSelector.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+        let categoryChart = null;
+
+        // Load Report
+        async function loadReport() {
+            const month = monthSelector.value;
+            if (!month) {
+                alert('Please select a month');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/monthly-report?month=${month}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+
+                // Update summary cards
+                document.getElementById('total-income').textContent = formatVND(data.summary.income) + ' ₫';
+                document.getElementById('total-expense').textContent = formatVND(data.summary.expense) + ' ₫';
+                document.getElementById('net-savings').textContent = formatVND(data.summary.net) + ' ₫';
+                document.getElementById('transaction-count').textContent = data.summary.count;
+
+                // Update category chart
+                updateCategoryChart(data.spending_by_category);
+
+                // Update top categories
+                updateTopCategories(data.spending_by_category);
+
+                // Update transactions list
+                updateMonthlyTransactions(data.transactions);
+
+            } catch (error) {
+                console.error('Error loading report:', error);
+                alert('Failed to load report');
+            }
+        }
+
+        function updateCategoryChart(spendingData) {
+            const ctx = document.getElementById('categoryChart').getContext('2d');
+
+            const labels = Object.keys(spendingData);
+            const values = Object.values(spendingData);
+
+            const colors = ['#ef4444', '#f59e0b', '#10b981', '#6366f1', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+
+            if (categoryChart) {
+                categoryChart.destroy();
+            }
+
+            categoryChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: colors,
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right'
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateTopCategories(spendingData) {
+            const container = document.getElementById('top-categories');
+
+            // Sort by amount descending
+            const sorted = Object.entries(spendingData)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 5);
+
+            if (sorted.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #9ca3af;">No expenses this month</p>';
+                return;
+            }
+
+            const total = Object.values(spendingData).reduce((sum, val) => sum + val, 0);
+
+            container.innerHTML = '';
+            sorted.forEach(([category, amount], index) => {
+                const percentage = (amount / total * 100).toFixed(1);
+                const colors = ['#ef4444', '#f59e0b', '#10b981', '#6366f1', '#8b5cf6'];
+                const color = colors[index % colors.length];
+
+                const item = document.createElement('div');
+                item.style.cssText = 'padding: 0.75rem; background: #f9fafb; border-radius: 0.5rem; border-left: 4px solid ' + color;
+                item.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                        <strong>${category}</strong>
+                        <span>${percentage}%</span>
+                    </div>
+                    <div style="font-size: 1.1rem; font-weight: 600; color: ${color};">
+                        ${formatVND(amount)} ₫
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function updateMonthlyTransactions(transactions) {
+            const container = document.getElementById('monthly-transactions');
+
+            if (transactions.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #9ca3af; padding: 2rem;">No transactions this month</p>';
+                return;
+            }
+
+            container.innerHTML = '';
+            transactions.forEach(t => {
+                const item = document.createElement('div');
+                item.style.cssText = 'padding: 0.75rem; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;';
+                item.innerHTML = `
+                    <div>
+                        <div style="font-weight: 600;">${t.category}</div>
+                        <div style="font-size: 0.875rem; color: #6b7280;">${t.date}</div>
+                        ${t.description ? `<div style="font-size: 0.875rem; color: #9ca3af;">${t.description}</div>` : ''}
+                    </div>
+                    <div style="font-size: 1.1rem; font-weight: 600; color: ${t.type === 'expense' ? '#ef4444' : '#10b981'};">
+                        ${t.type === 'expense' ? '-' : '+'}${formatVND(t.amount)} ₫
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        // Event listeners
+        document.getElementById('load-report-btn').addEventListener('click', loadReport);
+
+        // Load current month on page load
+        loadReport();
+    </script>
+</body>
+
+</html>
