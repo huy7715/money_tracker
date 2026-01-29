@@ -296,60 +296,210 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    const diaryDateInput = document.getElementById('diary-date');
+    const diaryContent = document.getElementById('diary-content');
+    const saveDiaryBtn = document.getElementById('save-diary-btn');
+    const diaryHistoryList = document.getElementById('diary-history-list');
+
+    // Set today's date as default
+    if (diaryDateInput) {
+        const today = new Date().toISOString().split('T')[0];
+        diaryDateInput.value = today;
+        loadDiary(today);
+        loadDiaryHistory();
+
+        diaryDateInput.addEventListener('change', (e) => {
+            loadDiary(e.target.value);
+        });
+    }
+
+    async function loadDiary(date) {
+        if (!diaryContent) return;
+        diaryContent.placeholder = "Loading your thoughts...";
+        try {
+            const response = await fetch(`/api/diary?date=${date}`);
+            const data = await response.json();
+            diaryContent.value = data.content || "";
+            diaryContent.placeholder = "Share your thoughts for today...";
+        } catch (error) {
+            console.error('Error loading diary:', error);
+            diaryContent.placeholder = "Failed to load thoughts.";
+        }
+    }
+
+    async function loadDiaryHistory() {
+        if (!diaryHistoryList) return;
+        try {
+            const response = await fetch('/api/diary/history');
+            const data = await response.json();
+
+            if (data.history && data.history.length > 0) {
+                diaryHistoryList.innerHTML = '';
+                data.history.forEach(date => {
+                    const btn = document.createElement('button');
+                    btn.className = 'history-item';
+                    btn.style.cssText = `
+                        background: #f9fafb;
+                        border: 1px solid #e5e7eb;
+                        padding: 0.6rem;
+                        border-radius: 0.5rem;
+                        font-size: 0.85rem;
+                        cursor: pointer;
+                        text-align: left;
+                        transition: all 0.2s;
+                        color: #374151;
+                        font-weight: 500;
+                        display: block;
+                        width: 100%;
+                    `;
+                    btn.onmouseover = () => btn.style.background = '#f3f4f6';
+                    btn.onmouseout = () => btn.style.background = '#f9fafb';
+                    btn.innerHTML = `<strong>${date}</strong>`;
+                    btn.onclick = () => {
+                        diaryDateInput.value = date;
+                        loadDiary(date);
+                    };
+                    diaryHistoryList.appendChild(btn);
+                });
+            } else {
+                diaryHistoryList.innerHTML = '<p style="font-size: 0.75rem; color: #9ca3af; text-align: center;">No notes recorded yet</p>';
+            }
+        } catch (error) {
+            console.error('Error loading history:', error);
+        }
+    }
+
+    saveDiaryBtn?.addEventListener('click', async () => {
+        const date = diaryDateInput.value;
+        const content = diaryContent.value;
+        if (!date) return;
+
+        saveDiaryBtn.textContent = "Saving...";
+        saveDiaryBtn.disabled = true;
+
+        try {
+            const response = await fetch('/api/diary', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ date, content })
+            });
+            if (response.ok) {
+                saveDiaryBtn.textContent = "Saved! ✓";
+                loadDiaryHistory(); // Refresh history list
+                setTimeout(() => {
+                    saveDiaryBtn.textContent = "Save Note";
+                    saveDiaryBtn.disabled = false;
+                }, 2000);
+            } else {
+                alert('Failed to save note');
+                saveDiaryBtn.textContent = "Save Note";
+                saveDiaryBtn.disabled = false;
+            }
+        } catch (error) {
+            console.error('Error saving diary:', error);
+            alert('An error occurred while saving');
+            saveDiaryBtn.textContent = "Save Note";
+            saveDiaryBtn.disabled = false;
+        }
+    });
+
+    // ========== SIDEBAR STATS ==========
+    async function updateSidebarStats(transactions) {
+        const spentStat = document.getElementById('month-spent-stat');
+        const countStat = document.getElementById('tx-count-stat');
+        if (!spentStat || !countStat) return;
+
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const currentMonthPrefix = `${year}-${month}`;
+
+        console.log("Filtering for month:", currentMonthPrefix);
+
+        const monthTxs = transactions.filter(t => {
+            if (!t.date) return false;
+            // Handle both 'YYYY-MM-DD' and 'YYYY-MM-DD HH:MM:SS' and 'YYYY-MM-DDTHH:MM'
+            const txDate = t.date.toString();
+            return txDate.startsWith(currentMonthPrefix);
+        });
+
+        console.log("Found monthly transactions:", monthTxs.length);
+
+        const totalSpent = monthTxs
+            .filter(t => t.type === 'expense')
+            .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+        spentStat.textContent = `${totalSpent.toLocaleString('vi-VN')} ₫`;
+        countStat.textContent = monthTxs.length;
+    }
+
+    // ========== MAIN DATA FETCHING ==========
     async function fetchData() {
+        console.log("Fetching new data from server...");
         try {
             const response = await fetch('/api/data');
             const data = await response.json();
 
+            if (!data) return;
+
             // Update balance
-            balanceAmount.textContent = `${data.balance.toLocaleString('vi-VN')} ₫`;
+            if (balanceAmount) {
+                balanceAmount.textContent = `${(data.balance || 0).toLocaleString('vi-VN')} ₫`;
+            }
 
-            // Process data for Chart
-            // We want to group by Category, but also know if it's Income or Expense for Coloring
-            const chartData = {}; // { 'CategoryName': { amount: 100, type: 'income' } }
+            // Update Stats in Sidebar
+            if (Array.isArray(data.transactions)) {
+                updateSidebarStats(data.transactions);
 
-            data.transactions.forEach(t => {
-                if (chartData[t.category]) {
-                    chartData[t.category].amount += t.amount;
-                } else {
-                    chartData[t.category] = { amount: t.amount, type: t.type };
+                // Process data for Chart
+                const chartData = {};
+                data.transactions.forEach(t => {
+                    const amount = Number(t.amount || 0);
+                    if (chartData[t.category]) {
+                        chartData[t.category].amount += amount;
+                    } else {
+                        chartData[t.category] = { amount: amount, type: t.type };
+                    }
+                });
+                updateChart(chartData);
+
+                // Update Transaction List
+                if (transactionList) {
+                    transactionList.innerHTML = '';
+                    data.transactions.forEach(t => {
+                        const li = document.createElement('li');
+                        li.className = `transaction-item ${t.type}`;
+                        li.innerHTML = `
+                            <div class="info">
+                                <span class="category">${t.category}</span>
+                                <span class="date">${t.date}</span>
+                            </div>
+                            <div class="right-section">
+                                <div class="amount">
+                                    ${t.type === 'expense' ? '-' : '+'}${Number(t.amount || 0).toLocaleString('vi-VN')} ₫
+                                </div>
+                                <div class="actions">
+                                    <button class="edit-btn" onclick="editTransaction(${t.id}, ${t.amount}, '${t.category}', '${t.type}', '${t.description}', '${t.date}')">Edit</button>
+                                    <button class="delete-btn" onclick="deleteTransaction(${t.id})">Delete</button>
+                                </div>
+                            </div>
+                        `;
+                        transactionList.appendChild(li);
+                    });
                 }
-            });
+            }
 
-            // Update Chart
-            updateChart(chartData);
-
-            // Update list
-            transactionList.innerHTML = '';
-            data.transactions.forEach(t => {
-                const li = document.createElement('li');
-                li.className = `transaction-item ${t.type}`;
-                li.innerHTML = `
-                    <div class="info">
-                        <span class="category">${t.category}</span>
-                        <span class="date">${t.date}</span>
-                    </div>
-                    <div class="right-section">
-                        <div class="amount">
-                            ${t.type === 'expense' ? '-' : '+'}${t.amount.toLocaleString('vi-VN')} ₫
-                        </div>
-                        <div class="actions">
-                            <button class="edit-btn" onclick="editTransaction(${t.id}, ${t.amount}, '${t.category}', '${t.type}', '${t.description}', '${t.date}')">Edit</button>
-                            <button class="delete-btn" onclick="deleteTransaction(${t.id})">Delete</button>
-                        </div>
-                    </div>
-                `;
-                transactionList.appendChild(li);
-            });
+            // Refresh budget status
+            if (typeof fetchBudgetStatus === 'function') {
+                await fetchBudgetStatus();
+            }
         } catch (error) {
-            console.error('Error fetching data:', error);
-        }
-
-        // Refresh budget status after updating transactions
-        if (typeof fetchBudgetStatus === 'function') {
-            await fetchBudgetStatus();
+            console.error('Error in fetchData:', error);
         }
     }
+
+    // Initial fetch to load data on page start
+    fetchData();
 
     function updateChart(dataMap) {
         const ctxElement = document.getElementById('expenseChart');
@@ -767,4 +917,3 @@ document.addEventListener('DOMContentLoaded', () => {
     // Fetch budget status on load
     fetchBudgetStatus();
 });
-

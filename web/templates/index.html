@@ -11,391 +11,451 @@
 </head>
 
 <body>
-    <div class="container">
-        <header style="position: relative;">
-            <h1>Money Tracker</h1>
-            <div style="position: absolute; top: 0; right: 0; display: flex; gap: 0.5rem;">
-                <button id="reset-bg-btn" title="Reset Background"
-                    style="background: rgba(255,255,255,0.3); width: 40px; height: 40px; border-radius: 50%; padding: 0; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); color: #ef4444; border: none; cursor: pointer;">
-                    ✕
-                </button>
-                <button id="bg-btn" title="Change Background"
-                    style="background: rgba(255,255,255,0.3); width: 40px; height: 40px; border-radius: 50%; padding: 0; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); border: none; cursor: pointer;">
-                    🎨
-                </button>
-                <input type="file" id="bg-input" accept="image/*" hidden>
+    <div class="app-layout">
+        <!-- Left Sidebar: Stats & Info -->
+        <aside class="sidebar left-sidebar">
+            <div class="sidebar-header">
+                <h3>📊 Quick Stats</h3>
             </div>
-            <div class="balance-card">
-                <h2>Total Balance</h2>
-                <div class="amount" id="balance-amount">{{ "{:,.0f}".format(balance) }} ₫</div>
-                <button id="advice-btn"
-                    style="background: rgba(255,255,255,0.2); margin-top: 1rem; width: auto; font-size: 0.9rem; padding: 0.5rem 1rem; border: 1px solid rgba(255,255,255,0.4);">
-                    💡 Get Financial Advice
-                </button>
-            </div>
-        </header>
-
-        <main>
-            <!-- Advice Modal -->
-            <div id="advice-modal" class="modal">
-                <div class="modal-content"
-                    style="max-width: 600px; background: linear-gradient(135deg, #ffffff 0%, #f3f4f6 100%);">
-                    <span class="close-btn" onclick="closeAdviceModal()">&times;</span>
-                    <h3>💸 Your Spending Analysis</h3>
-                    <div id="advice-content" style="line-height: 1.6; margin-top: 1rem;">
-                        <!-- AI Content Goes Here -->
-                    </div>
+            <div class="stats-container">
+                <div class="stat-item">
+                    <span>This Month</span>
+                    <strong id="month-spent-stat">0 ₫</strong>
+                </div>
+                <div class="stat-item">
+                    <span>Transactions</span>
+                    <strong id="tx-count-stat">0</strong>
                 </div>
             </div>
-            <!-- Chart Section -->
-            <section class="chart-section"
-                style="background: white; padding: 1.5rem; border-radius: 1rem; margin-bottom: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                    <h3 style="margin: 0;">Expense Breakdown</h3>
-                    <a href="/reports"
-                        style="text-decoration: none; background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); color: white; padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.875rem; font-weight: 500;">📊
-                        Monthly Reports</a>
-                </div>
-                <div class="chart-container" style="position: relative; height:300px; width:100%">
-                    <canvas id="expenseChart"></canvas>
-                </div>
-            </section>
+            <div class="quick-links" style="margin-top: 2rem;">
+                <h3>🔗 Quick Links</h3>
+                <a href="/reports" class="sidebar-link">Monthly Reports</a>
+                <a href="/export" class="sidebar-link">Export Data</a>
+            </div>
+        </aside>
 
-            <!-- Budget Manager Section -->
-            <section class="budget-manager"
-                style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 1.5rem; border-radius: 1rem; margin-bottom: 1.5rem; color: white; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                    <h3 style="margin: 0;">💰 Budget Manager</h3>
-                </div>
-                <p style="margin-bottom: 1rem; opacity: 0.9;">Set monthly spending limits for each category</p>
-
-                <!-- Budget Form - Dynamic Grid Style -->
-                <div class="budget-form-wrapper"
-                    style="background: rgba(255,255,255,0.15); padding: 0.75rem; border-radius: 1rem; margin-bottom: 1.5rem; backdrop-filter: blur(15px); border: 1px solid rgba(255,255,255,0.2);">
-                    <div class="budget-input-group"
-                        style="display: grid; grid-template-columns: 140px 1fr auto; gap: 0.5rem; align-items: stretch; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);">
-                        <select id="budget-category" class="budget-select"
-                            style="padding: 0.8rem; border-radius: 0.75rem; border: none; outline: none; font-size: 0.95rem; color: #1f2937; background: white; transition: all 0.4s ease; cursor: pointer; width: 100%;">
-                            <option value="">Category</option>
-                            <option value="Food">🍔 Food & Drink</option>
-                            <option value="Rent">🏠 Rent / Housing</option>
-                            <option value="Utilities">💡 Utilities</option>
-                            <option value="Transport">🚗 Transportation</option>
-                            <option value="Groceries">🛒 Groceries</option>
-                            <option value="Shopping">🛍️ Shopping</option>
-                            <option value="Entertainment">🎮 Entertainment</option>
-                            <option value="Travel">✈️ Travel</option>
-                            <option value="Health">💪 Health & Fitness</option>
-                            <option value="Other">📦 Other</option>
-                        </select>
-                        <input type="text" id="budget-limit" class="budget-input" placeholder="Limit (e.g. 20k or 350)"
-                            autocomplete="off"
-                            style="padding: 0.8rem; border-radius: 0.75rem; border: none; outline: none; font-size: 1rem; color: #1f2937; background: white; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); width: 100%;">
-                        <button id="set-budget-btn" class="budget-btn"
-                            style="background: white; color: #10b981; border: none; padding: 0 1.5rem; border-radius: 0.75rem; font-weight: 700; cursor: pointer; font-size: 1rem; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); display: flex; align-items: center; justify-content: center; white-space: nowrap; height: 100%;">
-                            <span class="btn-text">Set Budget</span>
-                            <span class="btn-icon">💰</span>
-                        </button>
-                    </div>
-                </div>
-
-                <style>
-                    /* Dynamic Budget Form Animations */
-                    .budget-input-group:focus-within {
-                        /* Sliding effect: shrink category, expand input, shrink button */
-                        grid-template-columns: 100px 1.5fr 60px;
-                    }
-
-                    .budget-input-group:focus-within .budget-select {
-                        font-size: 0.85rem;
-                        opacity: 0.8;
-                    }
-
-                    .budget-input-group:focus-within .budget-input {
-                        box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.3);
-                        font-size: 1.1rem;
-                    }
-
-                    .budget-input-group:focus-within .budget-btn {
-                        padding: 0;
-                        border-radius: 12px;
-                        width: 50px;
-                        height: 50px;
-                        margin-left: auto;
-                        box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.2);
-                        animation: pulse-green 2s infinite;
-                    }
-
-                    @keyframes pulse-green {
-                        0% {
-                            transform: scale(1);
-                        }
-
-                        50% {
-                            transform: scale(1.05);
-                        }
-
-                        100% {
-                            transform: scale(1);
-                        }
-                    }
-
-                    /* State Management for Button Content */
-                    .budget-btn .btn-icon {
-                        display: none;
-                        font-size: 1.5rem;
-                    }
-
-                    .budget-input-group:focus-within .budget-btn .btn-text {
-                        display: none;
-                    }
-
-                    .budget-input-group:focus-within .budget-btn .btn-icon {
-                        display: block;
-                    }
-
-                    /* Interactive hover to reveal detail even when focused */
-                    .budget-btn:hover {
-                        transform: translateY(-2px);
-                        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-                        background: #f0fdf4;
-                    }
-
-                    .budget-input-group:focus-within .budget-btn:hover {
-                        width: 140px;
-                        padding: 0 1.2rem;
-                        border-radius: 0.75rem;
-                        margin-left: 0;
-                    }
-
-                    .budget-input-group:focus-within .budget-btn:hover .btn-text {
-                        display: block;
-                    }
-
-                    .budget-input-group:focus-within .budget-btn:hover .btn-icon {
-                        display: none;
-                    }
-                </style>
-
-                <!-- Budget Status List -->
-                <div id="budget-list" style="display: flex; flex-direction: column; gap: 0.75rem;">
-                    <!-- Budget items will be inserted here -->
-                </div>
-            </section>
-
-            <section class="ai-assistant"
-                style="background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); padding: 1.5rem; border-radius: 1rem; margin-bottom: 1.5rem; color: white; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                    <h3 style="margin: 0;">✨ Magic Assistant</h3>
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <select id="model-selector"
-                            style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 0.5rem; padding: 0.2rem 0.4rem; font-size: 0.75rem; outline: none; cursor: pointer;">
-                            <option value="openai" style="color: black;">OpenAI</option>
-                            <option value="gemini" style="color: black;">Gemini</option>
-                        </select>
-                        <span id="ai-model-badge"
-                            style="background: rgba(255,255,255,0.2); padding: 0.2rem 0.6rem; border-radius: 1rem; font-size: 0.75rem; border: 1px solid rgba(255,255,255,0.3); font-weight: 500;">Loading
-                            AI...</span>
-                    </div>
-                </div>
-                <p style="margin-bottom: 1rem; opacity: 0.9;">"Spent 50k on coffee", "Salary 20m", or "Set food budget
-                    to 5m"</p>
-                <div class="ai-container" style="display: flex; gap: 0.5rem; align-items: stretch;">
-                    <input type="text" id="ai-input" placeholder="Type here (e.g. 'Coffee 30k')..." autocomplete="off">
-                    <button id="ai-btn">
-                        <span class="btn-text">Ask AI</span>
-                        <span class="btn-icon">✨</span>
+        <!-- Center: Main Content -->
+        <div class="container">
+            <header style="position: relative;">
+                <h1>Money Tracker</h1>
+                <div style="position: absolute; top: 0; right: 0; display: flex; gap: 0.5rem;">
+                    <button id="reset-bg-btn" title="Reset Background"
+                        style="background: rgba(255,255,255,0.3); width: 40px; height: 40px; border-radius: 50%; padding: 0; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); color: #ef4444; border: none; cursor: pointer;">
+                        ✕
                     </button>
-                    <div id="ai-loading">
-                        <span style="animation: spin 1s linear infinite; font-size: 1.5rem;">⏳</span>
+                    <button id="bg-btn" title="Change Background"
+                        style="background: rgba(255,255,255,0.3); width: 40px; height: 40px; border-radius: 50%; padding: 0; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); border: none; cursor: pointer;">
+                        🎨
+                    </button>
+                    <input type="file" id="bg-input" accept="image/*" hidden>
+                </div>
+                <div class="balance-card">
+                    <h2>Total Balance</h2>
+                    <div class="amount" id="balance-amount">{{ "{:,.0f}".format(balance) }} ₫</div>
+                    <button id="advice-btn"
+                        style="background: rgba(255,255,255,0.2); margin-top: 1rem; width: auto; font-size: 0.9rem; padding: 0.5rem 1rem; border: 1px solid rgba(255,255,255,0.4);">
+                        💡 Get Financial Advice
+                    </button>
+                </div>
+            </header>
+
+            <main>
+                <!-- Advice Modal -->
+                <div id="advice-modal" class="modal">
+                    <div class="modal-content"
+                        style="max-width: 600px; background: linear-gradient(135deg, #ffffff 0%, #f3f4f6 100%);">
+                        <span class="close-btn" onclick="closeAdviceModal()">&times;</span>
+                        <h3>💸 Your Spending Analysis</h3>
+                        <div id="advice-content" style="line-height: 1.6; margin-top: 1rem;">
+                            <!-- AI Content Goes Here -->
+                        </div>
                     </div>
                 </div>
-                <style>
-                    /* Specific Styles for AI Section to override globals */
-                    .ai-container input {
-                        flex: 1;
-                        /* Take available space */
-                        min-width: 0;
-                        /* Allow shrinking below content size if needed */
-                        padding: 1rem;
-                        border-radius: 0.75rem;
-                        border: 2px solid rgba(255, 255, 255, 0.3);
-                        outline: none;
-                        font-size: 1.1rem;
-                        color: #1f2937 !important;
-                        /* Force dark text */
-                        background: white !important;
-                        caret-color: #6366f1;
-                        transition: all 0.3s ease;
-                    }
+                <!-- Chart Section -->
+                <section class="chart-section"
+                    style="background: white; padding: 1.5rem; border-radius: 1rem; margin-bottom: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="margin: 0;">Expense Breakdown</h3>
+                        <a href="/reports"
+                            style="text-decoration: none; background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); color: white; padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.875rem; font-weight: 500;">📊
+                            Monthly Reports</a>
+                    </div>
+                    <div class="chart-container" style="position: relative; height:300px; width:100%">
+                        <canvas id="expenseChart"></canvas>
+                    </div>
+                </section>
 
-                    .ai-container input::placeholder {
-                        color: #9ca3af;
-                    }
+                <!-- Budget Manager Section -->
+                <section class="budget-manager"
+                    style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 1.5rem; border-radius: 1rem; margin-bottom: 1.5rem; color: white; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="margin: 0;">💰 Budget Manager</h3>
+                    </div>
+                    <p style="margin-bottom: 1rem; opacity: 0.9;">Set monthly spending limits for each category</p>
 
-                    .ai-container input:focus {
-                        border-color: white;
-                        box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.2);
-                    }
+                    <!-- Budget Form - Dynamic Grid Style -->
+                    <div class="budget-form-wrapper"
+                        style="background: rgba(255,255,255,0.15); padding: 0.75rem; border-radius: 1rem; margin-bottom: 1.5rem; backdrop-filter: blur(15px); border: 1px solid rgba(255,255,255,0.2);">
+                        <div class="budget-input-group"
+                            style="display: grid; grid-template-columns: 140px 1fr auto; gap: 0.5rem; align-items: stretch; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);">
+                            <select id="budget-category" class="budget-select"
+                                style="padding: 0.8rem; border-radius: 0.75rem; border: none; outline: none; font-size: 0.95rem; color: #1f2937; background: white; transition: all 0.4s ease; cursor: pointer; width: 100%;">
+                                <option value="">Category</option>
+                                <option value="Food">🍔 Food & Drink</option>
+                                <option value="Rent">🏠 Rent / Housing</option>
+                                <option value="Utilities">💡 Utilities</option>
+                                <option value="Transport">🚗 Transportation</option>
+                                <option value="Groceries">🛒 Groceries</option>
+                                <option value="Shopping">🛍️ Shopping</option>
+                                <option value="Entertainment">🎮 Entertainment</option>
+                                <option value="Travel">✈️ Travel</option>
+                                <option value="Health">💪 Health & Fitness</option>
+                                <option value="Other">📦 Other</option>
+                            </select>
+                            <input type="text" id="budget-limit" class="budget-input"
+                                placeholder="Limit (e.g. 20k or 350)" autocomplete="off"
+                                style="padding: 0.8rem; border-radius: 0.75rem; border: none; outline: none; font-size: 1rem; color: #1f2937; background: white; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); width: 100%;">
+                            <button id="set-budget-btn" class="budget-btn"
+                                style="background: white; color: #10b981; border: none; padding: 0 1.5rem; border-radius: 0.75rem; font-weight: 700; cursor: pointer; font-size: 1rem; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); display: flex; align-items: center; justify-content: center; white-space: nowrap; height: 100%;">
+                                <span class="btn-text">Set Budget</span>
+                                <span class="btn-icon">💰</span>
+                            </button>
+                        </div>
+                    </div>
 
-                    .ai-container button {
-                        width: auto !important;
-                        /* CRITICAL: Override global 100% width */
-                        background: white;
-                        color: #6366f1;
-                        border: none;
-                        padding: 0 1.5rem;
-                        border-radius: 0.75rem;
-                        font-weight: 700;
-                        cursor: pointer;
-                        font-size: 1.1rem;
-                        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-                        display: flex;
-                        align-items: center;
-                        gap: 0.5rem;
-                        white-space: nowrap;
-                        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-                        overflow: hidden;
-                    }
+                    <style>
+                        /* Dynamic Budget Form Animations */
+                        .budget-input-group:focus-within {
+                            /* Sliding effect: shrink category, expand input, shrink button */
+                            grid-template-columns: 100px 1.5fr 60px;
+                        }
 
-                    .ai-container .btn-icon {
-                        display: none;
-                    }
+                        .budget-input-group:focus-within .budget-select {
+                            font-size: 0.85rem;
+                            opacity: 0.8;
+                        }
 
-                    /* Interaction Logic: 
+                        .budget-input-group:focus-within .budget-input {
+                            box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.3);
+                            font-size: 1.1rem;
+                        }
+
+                        .budget-input-group:focus-within .budget-btn {
+                            padding: 0;
+                            border-radius: 12px;
+                            width: 50px;
+                            height: 50px;
+                            margin-left: auto;
+                            box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.2);
+                            animation: pulse-green 2s infinite;
+                        }
+
+                        @keyframes pulse-green {
+                            0% {
+                                transform: scale(1);
+                            }
+
+                            50% {
+                                transform: scale(1.05);
+                            }
+
+                            100% {
+                                transform: scale(1);
+                            }
+                        }
+
+                        /* State Management for Button Content */
+                        .budget-btn .btn-icon {
+                            display: none;
+                            font-size: 1.5rem;
+                        }
+
+                        .budget-input-group:focus-within .budget-btn .btn-text {
+                            display: none;
+                        }
+
+                        .budget-input-group:focus-within .budget-btn .btn-icon {
+                            display: block;
+                        }
+
+                        /* Interactive hover to reveal detail even when focused */
+                        .budget-btn:hover {
+                            transform: translateY(-2px);
+                            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                            background: #f0fdf4;
+                        }
+
+                        .budget-input-group:focus-within .budget-btn:hover {
+                            width: 140px;
+                            padding: 0 1.2rem;
+                            border-radius: 0.75rem;
+                            margin-left: 0;
+                        }
+
+                        .budget-input-group:focus-within .budget-btn:hover .btn-text {
+                            display: block;
+                        }
+
+                        .budget-input-group:focus-within .budget-btn:hover .btn-icon {
+                            display: none;
+                        }
+                    </style>
+
+                    <!-- Budget Status List -->
+                    <div id="budget-list" style="display: flex; flex-direction: column; gap: 0.75rem;">
+                        <!-- Budget items will be inserted here -->
+                    </div>
+                </section>
+
+                <section class="ai-assistant"
+                    style="background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); padding: 1.5rem; border-radius: 1rem; margin-bottom: 1.5rem; color: white; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="margin: 0;">✨ Magic Assistant</h3>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <select id="model-selector"
+                                style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 0.5rem; padding: 0.2rem 0.4rem; font-size: 0.75rem; outline: none; cursor: pointer;">
+                                <option value="openai" style="color: black;">OpenAI</option>
+                                <option value="gemini" style="color: black;">Gemini</option>
+                            </select>
+                            <span id="ai-model-badge"
+                                style="background: rgba(255,255,255,0.2); padding: 0.2rem 0.6rem; border-radius: 1rem; font-size: 0.75rem; border: 1px solid rgba(255,255,255,0.3); font-weight: 500;">Loading
+                                AI...</span>
+                        </div>
+                    </div>
+                    <p style="margin-bottom: 1rem; opacity: 0.9;">"Spent 50k on coffee", "Salary 20m", or "Set food
+                        budget
+                        to 5m"</p>
+                    <div class="ai-container" style="display: flex; gap: 0.5rem; align-items: stretch;">
+                        <input type="text" id="ai-input" placeholder="Type here (e.g. 'Coffee 30k')..."
+                            autocomplete="off">
+                        <button id="ai-btn">
+                            <span class="btn-text">Ask AI</span>
+                            <span class="btn-icon">✨</span>
+                        </button>
+                        <div id="ai-loading">
+                            <span style="animation: spin 1s linear infinite; font-size: 1.5rem;">⏳</span>
+                        </div>
+                    </div>
+                    <style>
+                        /* Specific Styles for AI Section to override globals */
+                        .ai-container input {
+                            flex: 1;
+                            /* Take available space */
+                            min-width: 0;
+                            /* Allow shrinking below content size if needed */
+                            padding: 1rem;
+                            border-radius: 0.75rem;
+                            border: 2px solid rgba(255, 255, 255, 0.3);
+                            outline: none;
+                            font-size: 1.1rem;
+                            color: #1f2937 !important;
+                            /* Force dark text */
+                            background: white !important;
+                            caret-color: #6366f1;
+                            transition: all 0.3s ease;
+                        }
+
+                        .ai-container input::placeholder {
+                            color: #9ca3af;
+                        }
+
+                        .ai-container input:focus {
+                            border-color: white;
+                            box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.2);
+                        }
+
+                        .ai-container button {
+                            width: auto !important;
+                            /* CRITICAL: Override global 100% width */
+                            background: white;
+                            color: #6366f1;
+                            border: none;
+                            padding: 0 1.5rem;
+                            border-radius: 0.75rem;
+                            font-weight: 700;
+                            cursor: pointer;
+                            font-size: 1.1rem;
+                            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                            display: flex;
+                            align-items: center;
+                            gap: 0.5rem;
+                            white-space: nowrap;
+                            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                            overflow: hidden;
+                        }
+
+                        .ai-container .btn-icon {
+                            display: none;
+                        }
+
+                        /* Interaction Logic: 
                        When Input is Focused (Typing) -> Button shrinks to Icon
                        However, user also said "Hover mouse cursor over it -> Enlarge"
                     */
 
-                    /* State: Typing (Input Focus) -> Shrink Button */
-                    .ai-container:focus-within button {
-                        padding: 0 1rem;
-                        max-width: 50px;
-                        /* Shrink to icon size */
-                    }
-
-                    .ai-container:focus-within button .btn-text {
-                        display: none;
-                    }
-
-                    .ai-container:focus-within button .btn-icon {
-                        display: inline-block;
-                    }
-
-                    /* State: Hovering Button (Even while typing) -> Expand Button */
-                    .ai-container button:hover {
-                        transform: translateY(-2px);
-                        box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
-                        padding: 0 1.5rem;
-                        max-width: 200px;
-                        /* Expand back */
-                    }
-
-                    .ai-container button:hover .btn-text {
-                        display: inline-block;
-                    }
-
-                    .ai-container button:hover .btn-icon {
-                        display: none;
-                    }
-
-                    #ai-loading {
-                        display: none;
-                        align-items: center;
-                        justify-content: center;
-                        background: rgba(255, 255, 255, 0.2);
-                        padding: 0 1.5rem;
-                        border-radius: 0.75rem;
-                    }
-
-                    @keyframes spin {
-                        from {
-                            transform: rotate(0deg);
+                        /* State: Typing (Input Focus) -> Shrink Button */
+                        .ai-container:focus-within button {
+                            padding: 0 1rem;
+                            max-width: 50px;
+                            /* Shrink to icon size */
                         }
 
-                        to {
-                            transform: rotate(360deg);
+                        .ai-container:focus-within button .btn-text {
+                            display: none;
                         }
-                    }
-                </style>
-            </section>
+
+                        .ai-container:focus-within button .btn-icon {
+                            display: inline-block;
+                        }
+
+                        /* State: Hovering Button (Even while typing) -> Expand Button */
+                        .ai-container button:hover {
+                            transform: translateY(-2px);
+                            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+                            padding: 0 1.5rem;
+                            max-width: 200px;
+                            /* Expand back */
+                        }
+
+                        .ai-container button:hover .btn-text {
+                            display: inline-block;
+                        }
+
+                        .ai-container button:hover .btn-icon {
+                            display: none;
+                        }
+
+                        #ai-loading {
+                            display: none;
+                            align-items: center;
+                            justify-content: center;
+                            background: rgba(255, 255, 255, 0.2);
+                            padding: 0 1.5rem;
+                            border-radius: 0.75rem;
+                        }
+
+                        @keyframes spin {
+                            from {
+                                transform: rotate(0deg);
+                            }
+
+                            to {
+                                transform: rotate(360deg);
+                            }
+                        }
+                    </style>
+                </section>
 
 
-            <section class="add-transaction">
-                <h3>Add Transaction</h3>
-                <form id="transaction-form">
-                    <div class="form-group">
-                        <label for="amount">Amount (in thousand ₫)</label>
-                        <input type="text" id="amount" required placeholder="e.g. 100 (= 100.000 ₫)" autocomplete="off">
-                    </div>
-                    <div class="form-group">
-                        <label for="category">Category</label>
-                        <select id="category" required>
-                            <option value="" disabled selected>Select category</option>
-                            <optgroup label="Essential Expenses">
-                                <option value="Food">Food & Drink</option>
-                                <option value="Rent">Rent / Housing</option>
-                                <option value="Utilities">Utilities (Electricity/Water)</option>
-                                <option value="Transport">Transportation</option>
-                                <option value="Groceries">Groceries</option>
-                            </optgroup>
-                            <optgroup label="Lifestyle">
-                                <option value="Shopping">Shopping</option>
-                                <option value="Entertainment">Entertainment</option>
-                                <option value="Travel">Travel</option>
-                                <option value="Health">Health & Fitness</option>
-                            </optgroup>
-                            <optgroup label="Income">
-                                <option value="Salary">Salary</option>
-                                <option value="Bonus">Bonus</option>
-                                <option value="Investment">Investment</option>
-                                <option value="Other Income">Other Income</option>
-                            </optgroup>
-                            <option value="Other">Other Expense</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="type">Type</label>
-                        <select id="type">
-                            <option value="expense">Expense</option>
-                            <option value="income">Income</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="description">Description (Optional)</label>
-                        <input type="text" id="description" placeholder="Short description">
-                    </div>
-                    <div class="form-group">
-                        <label for="date">Date</label>
-                        <input type="datetime-local" id="date">
-                    </div>
-                    <button type="submit">Add Transaction</button>
-                </form>
-            </section>
+                <section class="add-transaction">
+                    <h3>Add Transaction</h3>
+                    <form id="transaction-form">
+                        <div class="form-group">
+                            <label for="amount">Amount (in thousand ₫)</label>
+                            <input type="text" id="amount" required placeholder="e.g. 100 (= 100.000 ₫)"
+                                autocomplete="off">
+                        </div>
+                        <div class="form-group">
+                            <label for="category">Category</label>
+                            <select id="category" required>
+                                <option value="" disabled selected>Select category</option>
+                                <optgroup label="Essential Expenses">
+                                    <option value="Food">Food & Drink</option>
+                                    <option value="Rent">Rent / Housing</option>
+                                    <option value="Utilities">Utilities (Electricity/Water)</option>
+                                    <option value="Transport">Transportation</option>
+                                    <option value="Groceries">Groceries</option>
+                                </optgroup>
+                                <optgroup label="Lifestyle">
+                                    <option value="Shopping">Shopping</option>
+                                    <option value="Entertainment">Entertainment</option>
+                                    <option value="Travel">Travel</option>
+                                    <option value="Health">Health & Fitness</option>
+                                </optgroup>
+                                <optgroup label="Income">
+                                    <option value="Salary">Salary</option>
+                                    <option value="Bonus">Bonus</option>
+                                    <option value="Investment">Investment</option>
+                                    <option value="Other Income">Other Income</option>
+                                </optgroup>
+                                <option value="Other">Other Expense</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="type">Type</label>
+                            <select id="type">
+                                <option value="expense">Expense</option>
+                                <option value="income">Income</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="description">Description (Optional)</label>
+                            <input type="text" id="description" placeholder="Short description">
+                        </div>
+                        <div class="form-group">
+                            <label for="date">Date</label>
+                            <input type="datetime-local" id="date">
+                        </div>
+                        <button type="submit">Add Transaction</button>
+                    </form>
+                </section>
 
-            <section class="recent-transactions">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                    <h3 style="margin-bottom: 0;">Recent Transactions</h3>
-                    <a href="/export" class="export-btn"
-                        style="text-decoration: none; background-color: #10b981; color: white; padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.875rem; font-weight: 500;">Export
-                        to Excel</a>
+                <section class="recent-transactions">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="margin-bottom: 0;">Recent Transactions</h3>
+                        <a href="/export" class="export-btn"
+                            style="text-decoration: none; background-color: #10b981; color: white; padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.875rem; font-weight: 500;">Export
+                            to Excel</a>
+                    </div>
+                    <ul id="transaction-list">
+                        {% for transaction in transactions %}
+                        <li class="transaction-item {{ transaction.type }}">
+                            <div class="info">
+                                <span class="category">{{ transaction.category }}</span>
+                                <span class="date">{{ transaction.date }}</span>
+                            </div>
+                            <div class="amount">
+                                {{ "-" if transaction.type == "expense" else "+" }}{{
+                                "{:,.0f}".format(transaction.amount)
+                                }} ₫
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </section>
+            </main>
+        </div>
+
+        <!-- Right Sidebar: Daily Journal -->
+        <aside class="sidebar right-sidebar">
+            <div class="sidebar-header">
+                <h3>📝 Daily Journal</h3>
+                <input type="date" id="diary-date"
+                    style="padding: 0.3rem; font-size: 0.8rem; border-radius: 0.4rem; border: 1px solid #ddd; margin-top: 0.5rem; width: 100%;">
+            </div>
+            <div class="diary-container">
+                <textarea id="diary-content" placeholder="Share your thoughts for today..."
+                    style="width: 100%; height: 300px; padding: 1rem; border-radius: 0.8rem; border: 1px solid #e5e7eb; resize: none; font-family: inherit; font-size: 0.95rem; margin-bottom: 1rem; background: rgba(255,255,255,0.5);"></textarea>
+                <button id="save-diary-btn"
+                    style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); margin-bottom: 1.5rem;">Save
+                    Note</button>
+
+                <div class="diary-history" style="border-top: 1px solid #eee; padding-top: 1.5rem;">
+                    <h4
+                        style="font-size: 0.85rem; color: #6b7280; margin-bottom: 0.8rem; display: flex; align-items: center; gap: 0.4rem;">
+                        📅 Recent Notes
+                    </h4>
+                    <div id="diary-history-list" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        <!-- History items will be injected here -->
+                        <p style="font-size: 0.75rem; color: #9ca3af; text-align: center;">No notes recorded yet</p>
+                    </div>
                 </div>
-                <ul id="transaction-list">
-                    {% for transaction in transactions %}
-                    <li class="transaction-item {{ transaction.type }}">
-                        <div class="info">
-                            <span class="category">{{ transaction.category }}</span>
-                            <span class="date">{{ transaction.date }}</span>
-                        </div>
-                        <div class="amount">
-                            {{ "-" if transaction.type == "expense" else "+" }}{{ "{:,.0f}".format(transaction.amount)
-                            }} ₫
-                        </div>
-                    </li>
-                    {% endfor %}
-                </ul>
-            </section>
-        </main>
+            </div>
+        </aside>
     </div>
     <!-- Edit Modal -->
     <div id="edit-modal" class="modal">

@@ -121,3 +121,12 @@ class FinanceManager:
             'transactions': [t.__dict__ for t in transactions]
         }
 
+    def save_diary(self, date, content):
+        return self.storage.save_diary(date, content)
+
+    def get_diary(self, date):
+        return self.storage.get_diary(date)
+
+    def get_diary_history(self):
+        return self.storage.get_diary_history()
+

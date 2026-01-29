@@ -239,5 +239,38 @@ def get_monthly_report():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# Diary endpoints
+@app.route('/api/diary', methods=['GET'])
+def get_diary():
+    try:
+        date = request.args.get('date')
+        if not date:
+            return jsonify({'error': 'No date provided'}), 400
+        content = manager.get_diary(date)
+        return jsonify({'content': content})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/diary', methods=['POST'])
+def save_diary():
+    try:
+        data = request.json
+        date = data.get('date')
+        content = data.get('content')
+        if not date:
+            return jsonify({'error': 'No date provided'}), 400
+        manager.save_diary(date, content)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/diary/history', methods=['GET'])
+def get_diary_history():
+    try:
+        history = manager.get_diary_history()
+        return jsonify({'history': history})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     app.run(debug=True)

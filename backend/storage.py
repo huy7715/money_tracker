@@ -34,6 +34,13 @@ class Storage:
                 UNIQUE(category, month)
             )
         ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS diary (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                date TEXT UNIQUE NOT NULL,
+                content TEXT NOT NULL
+            )
+        ''')
         conn.commit()
         conn.close()
 
@@ -217,4 +224,45 @@ class Storage:
                 date=row['date']
             ))
         return transactions
+
+    # Diary methods
+    def save_diary(self, date, content):
+        conn = self._get_conn()
+        cursor = conn.cursor()
+        
+        # If content is empty, delete the entry instead of saving/updating
+        if not content or not content.strip():
+            cursor.execute('DELETE FROM diary WHERE date = ?', (date,))
+        else:
+            try:
+                cursor.execute('''
+                    INSERT INTO diary (date, content)
+                    VALUES (?, ?)
+                ''', (date, content))
+            except sqlite3.IntegrityError:
+                cursor.execute('''
+                    UPDATE diary
+                    SET content = ?
+                    WHERE date = ?
+                ''', (content, date))
+        
+        conn.commit()
+        conn.close()
+        return True
+
+    def get_diary(self, date):
+        conn = self._get_conn()
+        cursor = conn.cursor()
+        cursor.execute('SELECT content FROM diary WHERE date = ?', (date,))
+        row = cursor.fetchone()
+        conn.close()
+        return row['content'] if row else ""
+
+    def get_diary_history(self):
+        conn = self._get_conn()
+        cursor = conn.cursor()
+        cursor.execute('SELECT date FROM diary ORDER BY date DESC')
+        rows = cursor.fetchall()
+        conn.close()
+        return [row['date'] for row in rows]
 
