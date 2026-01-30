@@ -235,6 +235,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (descInput) descInput.value = result.description;
                 }
 
+                // Auto-select Payment Source based on AI
+                const assetSelect = document.getElementById('transaction-asset');
+                if (result.payment_source && assetSelect) {
+                    for (let i = 0; i < assetSelect.options.length; i++) {
+                        const opt = assetSelect.options[i];
+                        if (opt.text.toLowerCase().includes(result.payment_source.toLowerCase())) {
+                            assetSelect.selectedIndex = i;
+                            break;
+                        }
+                    }
+                }
+
                 // Clear AI input
                 aiInput.value = '';
 
@@ -266,6 +278,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const category = document.getElementById('category').value;
         const type = document.getElementById('type').value;
         const description = document.getElementById('description').value;
+        const assetId = document.getElementById('transaction-asset').value; // New
 
         let amountIndex = getFullAmount(amountInput);
 
@@ -274,7 +287,8 @@ document.addEventListener('DOMContentLoaded', () => {
             category: category,
             type: type,
             description: description,
-            date: document.getElementById('date').value
+            date: document.getElementById('date').value,
+            asset_id: assetId // New
         };
 
         try {
@@ -441,6 +455,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
 
             if (!data) return;
+
+            // Fetch assets
+            fetchAssets();
 
             // Update balance
             if (balanceAmount) {
@@ -916,4 +933,175 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Fetch budget status on load
     fetchBudgetStatus();
+
+    // ========== ASSETS & SAVINGS LOGIC ==========
+    async function fetchAssets() {
+        const loading = document.getElementById('assets-loading');
+        const content = document.getElementById('assets-content');
+        if (!loading || !content) return;
+
+        try {
+            const response = await fetch('/api/assets');
+            const assets = await response.json();
+
+            loading.style.display = 'none';
+            content.style.display = 'block';
+
+            let cash = 0;
+            let bank = 0;
+            const savings = [];
+
+            assets.forEach(a => {
+                if (a.type === 'Cash') cash += a.amount;
+                else if (a.type === 'Bank') bank += a.amount;
+                else if (a.type === 'Savings' || a.type === 'Cumulative') savings.push(a);
+            });
+
+            // Populate Payment Source Dropdown (Liquid only)
+            const assetSelect = document.getElementById('transaction-asset');
+            if (assetSelect) {
+                // Clear existing options except default "None"
+                while (assetSelect.options.length > 1) {
+                    assetSelect.remove(1);
+                }
+
+                assets.forEach(a => {
+                    if (a.type === 'Cash' || a.type === 'Bank') {
+                        const opt = document.createElement('option');
+                        opt.value = a.id;
+                        opt.textContent = `${a.name} (${formatVND(a.amount)})`;
+                        assetSelect.appendChild(opt);
+                    }
+                });
+            }
+
+            // Update Liquid Cards
+            document.getElementById('asset-cash').textContent = formatVND(cash) + ' ₫';
+            document.getElementById('asset-bank').textContent = formatVND(bank) + ' ₫';
+
+            // Render Savings List with Calculations
+            const list = document.getElementById('savings-list');
+            list.innerHTML = '';
+
+            savings.forEach(s => {
+                // Calculate Interest
+                // Formula: Principal * Rate% * Days / 365
+                // Or simplified: Principal * Rate% * Months / 12
+
+                let matureDateObj = null;
+                let startDateObj = s.start_date ? new Date(s.start_date) : new Date(); // Fallback if missing
+                const now = new Date();
+
+                if (s.end_date) {
+                    matureDateObj = new Date(s.end_date);
+                } else if (s.term_months) {
+                    // Start date + months
+                    // We need a stable start date. For the user's specific items we seeded 2024-01-30.
+                    matureDateObj = new Date(startDateObj);
+                    matureDateObj.setMonth(matureDateObj.getMonth() + s.term_months);
+                }
+
+                // If we know maturity, we can calculate expected full return
+                let expectedInterest = 0;
+                let progress = 0;
+
+                // Interest Calculation Logic based on Term or Date
+                if (s.term_months && s.interest_rate) {
+                    // Term Deposit: Interest = Principal * Rate% * (Months/12)
+                    expectedInterest = s.amount * (s.interest_rate / 100) * (s.term_months / 12);
+                } else if (s.type === 'Cumulative') {
+                    // Cumulative Fund logic: 
+                    // Principal increases by 'auto_contribution' monthly.
+                    // Total invested = StartAmount + Monthly * Months
+
+                    if (matureDateObj && startDateObj) {
+                        const diffTime = Math.abs(matureDateObj - startDateObj);
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                        const months = Math.floor(diffDays / 30); // Approx
+
+                        // Approx total principal at end
+                        const totalPrincipal = s.amount + (s.auto_contribution || 0) * months;
+                        const avgBalance = (s.amount + totalPrincipal) / 2;
+                        const years = diffDays / 365.0;
+                        expectedInterest = avgBalance * (s.interest_rate / 100) * years;
+                    }
+                } else if (matureDateObj && startDateObj) {
+                    // Date diff based: Interest = Principal * Rate% * (Years)
+                    const diffTime = Math.abs(matureDateObj - startDateObj);
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    const years = diffDays / 365.0;
+                    expectedInterest = s.amount * (s.interest_rate / 100) * years;
+                }
+
+                if (matureDateObj) {
+                    // Progress Bar
+                    const totalDuration = matureDateObj.getTime() - startDateObj.getTime();
+                    const elapsed = now.getTime() - startDateObj.getTime();
+                    // Clamp 0-100
+                    progress = Math.min(100, Math.max(0, (elapsed / totalDuration) * 100));
+                }
+
+                const finalValue = s.amount + expectedInterest;
+
+                // Create Card
+                const item = document.createElement('div');
+                item.style.cssText = `
+                    background: rgba(255,255,255,0.1); 
+                    padding: 1rem; 
+                    border-radius: 0.75rem; 
+                    border: 1px solid rgba(255,255,255,0.2);
+                    position: relative;
+                    overflow: hidden;
+                `;
+
+                // Progress Bar Background Layer
+                const progressBar = document.createElement('div');
+                progressBar.style.cssText = `
+                    position: absolute;
+                    bottom: 0;
+                    left: 0;
+                    height: 4px;
+                    background: #34d399; /* Emerald 400 */
+                    width: ${progress}%;
+                    transition: width 1s ease-in-out;
+                    opacity: 0.8;
+                `;
+
+                item.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem; position: relative; z-index: 1;">
+                        <div>
+                            <div style="font-size: 0.95rem; font-weight: 700;">${s.name}</div>
+                            <div style="font-size: 0.75rem; opacity: 0.7;">
+                                Ends: ${matureDateObj ? matureDateObj.toLocaleDateString('vi-VN') : 'Unknown'} 
+                                (${progress.toFixed(0)}% elapsed)
+                            </div>
+                        </div>
+                        <div style="background: rgba(52, 211, 153, 0.2); color: #6ee7b7; padding: 0.2rem 0.6rem; border-radius: 1rem; font-size: 0.75rem; font-weight: 600;">
+                            ${s.interest_rate}% / year
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; justify-content: space-between; align-items: flex-end; position: relative; z-index: 1;">
+                        <div>
+                            <div style="font-size: 0.75rem; opacity: 0.8; margin-bottom: 0.1rem;">Dep. Amount</div>
+                            <div style="font-size: 1.1rem; font-weight: 600;">${formatVND(s.amount)} ₫</div>
+                        </div>
+                        <div style="text-align: right;">
+                             <div style="font-size: 0.75rem; opacity: 0.8; margin-bottom: 0.1rem;">Est. Profit</div>
+                             <div style="font-size: 1.1rem; font-weight: 600; color: #6ee7b7;">+${formatVND(expectedInterest.toFixed(0))} ₫</div>
+                        </div>
+                    </div>
+                `;
+
+                item.appendChild(progressBar);
+                list.appendChild(item);
+            });
+
+        } catch (e) {
+            console.error('Error fetching assets:', e);
+            if (loading) loading.textContent = 'Failed to load assets.';
+        }
+    }
 });
+
+

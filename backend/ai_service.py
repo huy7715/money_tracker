@@ -65,7 +65,8 @@ class AIService:
             "category": string (Food, Rent, Utilities, Transport, Groceries, Shopping, Entertainment, Travel, Health, Salary, Bonus, Investment, Other Income, Other),
             "type": "expense" or "income",
             "description": string,
-            "date": "YYYY-MM-DDTHH:MM"
+            "date": "YYYY-MM-DDTHH:MM",
+            "payment_source": "Cash" or "Bank" or null
         }}
 
         If it's a BUDGET, return:
@@ -83,6 +84,9 @@ class AIService:
           * "triệu", "tr", "m" -> multiply by 1,000,000 (e.g., "3 triệu" -> 3000000)
           * "tỷ" -> multiply by 1,000,000,000 (e.g., "3 tỷ" -> 3000000000)
           * "rưỡi" -> adds half of the preceding unit (e.g., "3 triệu rưỡi" -> 3500000)
+        - Payment Source Detection:
+          * If user mentions "tiền mặt", "cash", "ví" -> set payment_source to "Cash"
+          * If user mentions "chuyển khoản", "ck", "bank", "ngân hàng", "thẻ", "card" -> set payment_source to "Bank"
         - For budget adjustments:
           * If user says "tăng thêm", "thêm vào", "cộng thêm", "increase", "add" -> set adjustment to "increase"
           * If user says "giảm bớt", "giảm đi", "bớt đi", "decrease", "reduce" -> set adjustment to "decrease"
@@ -92,6 +96,8 @@ class AIService:
           * "tăng thêm 500k cho food" -> amount: 500000, category: Food, adjustment: "increase"
           * "giảm 200 ngàn budget shopping" -> amount: 200000, category: Shopping, adjustment: "decrease"
           * "giảm food xuống còn 1 triệu" -> amount: 1000000, category: Food, adjustment: null
+          * "ăn tối 500k tiền mặt" -> amount: 500000, category: Food, type: expense, payment_source: "Cash"
+          * "chuyển khoản 2tr tiền nhà" -> amount: 2000000, category: Rent, type: expense, payment_source: "Bank"
         - Return the full numeric value as a number.
         - For transactions, if relative dates (tomorrow, etc.) are used, calculate the exact date.
         - For budgets, if no month is specified, use the Current Month.

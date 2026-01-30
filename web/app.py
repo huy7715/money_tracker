@@ -3,6 +3,7 @@ import csv
 import io
 from money_tracker.backend.manager import FinanceManager
 import os
+from datetime import datetime
 
 app = Flask(__name__)
 # Initialize manager with a database in the root directory
@@ -12,8 +13,18 @@ manager = FinanceManager(db_path=os.path.join(root_dir, 'money_tracker.db'))
 
 @app.route('/')
 def index():
-    balance = manager.get_balance()
-    transactions = manager.get_recent_transactions()
+    # User request: "Total Balance" should show only specific month usage (Net Income)
+    current_month = datetime.now().strftime("%Y-%m")
+    
+    # Auto-process recurring savings
+    manager.check_recurring_contributions(current_month)
+
+    # Calculate monthly net income
+    balance = manager.get_balance(current_month)
+    
+    # User request: Chart and List should also show only specific month usage
+    transactions = manager.get_recent_transactions(current_month)
+    
     return render_template('index.html', balance=balance, transactions=transactions)
 
 @app.route('/reports')
@@ -30,7 +41,8 @@ def add_transaction():
             category=data['category'],
             type=data['type'],
             description=data.get('description', ''),
-            date=data.get('date')
+            date=data.get('date'),
+            asset_id=data.get('asset_id')
         )
         return jsonify({'success': True}), 201
     except Exception as e:
@@ -62,8 +74,14 @@ def update_transaction(transaction_id):
 
 @app.route('/api/data')
 def get_data():
-    balance = manager.get_balance()
-    transactions = manager.get_recent_transactions()
+    current_month = datetime.now().strftime("%Y-%m")
+    
+    # Auto-process recurring savings
+    manager.check_recurring_contributions(current_month)
+    
+    # Return data strictly for current month as requested
+    balance = manager.get_balance(current_month)
+    transactions = manager.get_recent_transactions(current_month)
     return jsonify({
         'balance': balance,
         'transactions': [vars(t) for t in transactions]
@@ -271,6 +289,16 @@ def get_diary_history():
         return jsonify({'history': history})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/assets', methods=['GET'])
+def get_assets():
+    try:
+        assets = manager.get_assets()
+        return jsonify(assets)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -50,7 +50,7 @@
                     <input type="file" id="bg-input" accept="image/*" hidden>
                 </div>
                 <div class="balance-card">
-                    <h2>Total Balance</h2>
+                    <h2>Monthly Balance</h2>
                     <div class="amount" id="balance-amount">{{ "{:,.0f}".format(balance) }} ₫</div>
                     <button id="advice-btn"
                         style="background: rgba(255,255,255,0.2); margin-top: 1rem; width: auto; font-size: 0.9rem; padding: 0.5rem 1rem; border: 1px solid rgba(255,255,255,0.4);">
@@ -209,6 +209,50 @@
                     </div>
                 </section>
 
+                <!-- Assets Overview Section -->
+                <section class="assets-overview"
+                    style="background: linear-gradient(135deg, #0e7490 0%, #0891b2 100%); padding: 1.5rem; border-radius: 1rem; margin-bottom: 1.5rem; color: white; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="margin: 0;">💰 My Assets & Savings</h3>
+                    </div>
+
+                    <div id="assets-loading" style="text-align: center; opacity: 0.8; font-size: 0.9rem;">
+                        Loading assets...
+                    </div>
+
+                    <div id="assets-content" style="display: none;">
+                        <!-- Liquid Assets -->
+                        <div style="margin-bottom: 1.5rem;">
+                            <h4
+                                style="margin: 0 0 0.5rem 0; font-size: 0.9rem; text-transform: uppercase; opacity: 0.9; letter-spacing: 0.05em;">
+                                Liquid Assets</h4>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                                <div
+                                    style="background: rgba(255,255,255,0.15); padding: 1rem; border-radius: 0.75rem; border: 1px solid rgba(255,255,255,0.2);">
+                                    <div style="font-size: 0.8rem; opacity: 0.8;">Cash</div>
+                                    <div style="font-size: 1.25rem; font-weight: 700;" id="asset-cash">0 ₫</div>
+                                </div>
+                                <div
+                                    style="background: rgba(255,255,255,0.15); padding: 1rem; border-radius: 0.75rem; border: 1px solid rgba(255,255,255,0.2);">
+                                    <div style="font-size: 0.8rem; opacity: 0.8;">Bank</div>
+                                    <div style="font-size: 1.25rem; font-weight: 700;" id="asset-bank">0 ₫</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Savings -->
+                        <div>
+                            <h4
+                                style="margin: 0 0 0.5rem 0; font-size: 0.9rem; text-transform: uppercase; opacity: 0.9; letter-spacing: 0.05em;">
+                                Savings</h4>
+                            <div id="savings-list" style="display: flex; flex-direction: column; gap: 0.75rem;">
+                                <!-- Savings items will be injected here -->
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 <section class="ai-assistant"
                     style="background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); padding: 1.5rem; border-radius: 1rem; margin-bottom: 1.5rem; color: white; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
                     <div
@@ -358,6 +402,7 @@
                             <input type="text" id="amount" required placeholder="e.g. 100 (= 100.000 ₫)"
                                 autocomplete="off">
                         </div>
+
                         <div class="form-group">
                             <label for="category">Category</label>
                             <select id="category" required>
@@ -389,6 +434,13 @@
                             <select id="type">
                                 <option value="expense">Expense</option>
                                 <option value="income">Income</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="payment-source-group">
+                            <label for="transaction-asset">Payment Source (Optional)</label>
+                            <select id="transaction-asset">
+                                <option value="">None (Just track)</option>
+                                <!-- Populated by JS -->
                             </select>
                         </div>
                         <div class="form-group">

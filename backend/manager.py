@@ -6,7 +6,7 @@ class FinanceManager:
     def __init__(self, db_path='money_tracker.db'):
         self.storage = Storage(db_path)
 
-    def add_transaction(self, amount, category, type, description, date=None):
+    def add_transaction(self, amount, category, type, description, date=None, asset_id=None):
         if not date:
             date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         transaction = Transaction(
@@ -14,17 +14,61 @@ class FinanceManager:
             category=category,
             type=type,
             description=description,
-            date=date
+            date=date,
+            asset_id=asset_id
         )
-        return self.storage.add_transaction(transaction)
+        
+        # Save transaction
+        new_transaction = self.storage.add_transaction(transaction)
+        
+        # If asset_id provided, update asset balance
+        if asset_id:
+            try:
+                # Get current asset details
+                asset = next((a for a in self.storage.get_assets() if str(a['id']) == str(asset_id)), None)
+                if asset:
+                    if type == 'expense':
+                        new_balance = asset['amount'] - transaction.amount
+                    else: # income
+                        new_balance = asset['amount'] + transaction.amount
+                        
+                    # Update balance (preserving last_updated_month if exists)
+                    self.storage.update_asset_balance(asset['id'], new_balance, asset.get('last_updated_month'))
+            except Exception as e:
+                print(f"Error updating asset balance: {e}")
+                
+        return new_transaction
 
-    def get_recent_transactions(self):
+    def get_recent_transactions(self, month=None):
+        if month:
+            return self.storage.get_transactions_by_month(month)
         return self.storage.get_transactions()
 
-    def get_balance(self):
-        return self.storage.get_balance()
+    def get_balance(self, month=None):
+        return self.storage.get_balance(month)
 
     def delete_transaction(self, transaction_id):
+        # 1. Fetch transaction details before deletion
+        transaction = self.storage.get_transaction(transaction_id)
+        
+        if transaction and transaction.asset_id:
+            try:
+                # 2. Get current asset details
+                asset = next((a for a in self.storage.get_assets() if str(a['id']) == str(transaction.asset_id)), None)
+                if asset:
+                    # 3. Reverse the amount
+                    if transaction.type == 'expense':
+                        # If it was an expense, refund it
+                        new_balance = asset['amount'] + transaction.amount
+                    else:
+                        # If it was income, remove it
+                        new_balance = asset['amount'] - transaction.amount
+                    
+                    self.storage.update_asset_balance(asset['id'], new_balance, asset.get('last_updated_month'))
+            except Exception as e:
+                print(f"Error reversing asset balance move: {e}")
+
+        # 4. Perform deletion
         return self.storage.delete_transaction(transaction_id)
 
     def update_transaction(self, transaction_id, amount, category, type, description, date):
@@ -129,4 +173,41 @@ class FinanceManager:
 
     def get_diary_history(self):
         return self.storage.get_diary_history()
+
+    def get_assets(self):
+        return self.storage.get_assets()
+
+    def check_recurring_contributions(self, current_month):
+        """
+        Check and process auto-contributions for the given month (YYYY-MM).
+        If an asset has auto_contribution > 0 and last_updated_month < current_month,
+        1. Add Expense Transaction (Deduct from Income context)
+        2. Increase Asset Amount
+        3. Update last_updated_month
+        """
+        assets = self.storage.get_assets()
+        for asset in assets:
+            if asset['auto_contribution'] > 0:
+                last_month = asset['last_updated_month']
+                # If never updated or older than current month
+                if not last_month or last_month < current_month:
+                    # Perform Contribution
+                    print(f"Processing recurring contribution for {asset['name']} in {current_month}")
+                    
+                    # 1. Add Transaction
+                    self.add_transaction(
+                        amount=asset['auto_contribution'],
+                        category="Savings",
+                        type="expense",
+                        description=f"Auto-deposit to {asset['name']}",
+                        date=f"{current_month}-01" # Default to 1st of month
+                    )
+                    
+                    # 2. Update Asset
+                    new_amount = asset['amount'] + asset['auto_contribution']
+                    self.storage.update_asset_balance(asset['id'], new_amount, current_month)
+                    return True # Processed something
+        return False
+
+
 
