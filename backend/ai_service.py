@@ -133,37 +133,4 @@ class AIService:
             return {"error": "Only transactions are supported on this endpoint"}
         return result
 
-    def analyze_spending(self, transactions_str):
-        prompt = f"""
-        You are a friendly and wise Financial Advisor.
-        Analyze the following transaction history for the user:
-        
-        {transactions_str}
 
-        INSTRUCTIONS:
-        1. Summarize their spending habits briefly (e.g. "You spend a lot on Food").
-        2. Calculate rough percentages if obvious.
-        3. Give exactly 3 SPECIFIC, ACTIONABLE, and FRIENDLY tips to help them save money based on these specific transactions.
-        
-        Format your response in nice Markdown (use bolding, bullet points). 
-        Keep it encouraging!
-        """
-        
-        provider = self.get_active_provider()
-        try:
-            if provider == "openai":
-                if not self.openai_client: return "OpenAI not configured"
-                response = self.openai_client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[
-                        {"role": "system", "content": "You are a helpful financial advisor."},
-                        {"role": "user", "content": prompt}
-                    ]
-                )
-                return response.choices[0].message.content
-            else:
-                if not self.gemini_model: return "Gemini not configured"
-                response = self.gemini_model.generate_content(prompt)
-                return response.text
-        except Exception as e:
-            return f"Sorry, I couldn't analyze your spending right now using {provider}. Error: {str(e)}"

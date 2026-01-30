@@ -52,25 +52,10 @@
                 <div class="balance-card">
                     <h2>Monthly Balance</h2>
                     <div class="amount" id="balance-amount">{{ "{:,.0f}".format(balance) }} ₫</div>
-                    <button id="advice-btn"
-                        style="background: rgba(255,255,255,0.2); margin-top: 1rem; width: auto; font-size: 0.9rem; padding: 0.5rem 1rem; border: 1px solid rgba(255,255,255,0.4);">
-                        💡 Get Financial Advice
-                    </button>
                 </div>
             </header>
 
             <main>
-                <!-- Advice Modal -->
-                <div id="advice-modal" class="modal">
-                    <div class="modal-content"
-                        style="max-width: 600px; background: linear-gradient(135deg, #ffffff 0%, #f3f4f6 100%);">
-                        <span class="close-btn" onclick="closeAdviceModal()">&times;</span>
-                        <h3>💸 Your Spending Analysis</h3>
-                        <div id="advice-content" style="line-height: 1.6; margin-top: 1rem;">
-                            <!-- AI Content Goes Here -->
-                        </div>
-                    </div>
-                </div>
                 <!-- Chart Section -->
                 <section class="chart-section"
                     style="background: white; padding: 1.5rem; border-radius: 1rem; margin-bottom: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">

@@ -154,25 +154,7 @@ def ai_parse():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/analyze')
-def analyze_spending():
-    try:
-        transactions = manager.get_recent_transactions()
-        if not transactions:
-            return jsonify({'analysis': "You don't have enough transactions yet! Add some spending first."})
 
-        # Format transactions for AI
-        tx_str = ""
-        for t in transactions:
-            tx_str += f"- {t.date}: {t.category} ({t.type}) - {t.amount} ({t.description})\n"
-
-        from money_tracker.backend.ai_service import AIService
-        ai_service = AIService()
-        analysis = ai_service.analyze_spending(tx_str)
-        
-        return jsonify({'analysis': analysis})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/switch-model', methods=['POST'])
 def switch_model():

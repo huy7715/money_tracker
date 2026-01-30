@@ -699,48 +699,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Advice Logic
-    const adviceBtn = document.getElementById('advice-btn');
-    const adviceModal = document.getElementById('advice-modal');
-    const adviceContent = document.getElementById('advice-content');
 
-    window.closeAdviceModal = () => {
-        adviceModal.style.display = 'none';
-    };
 
-    adviceBtn.addEventListener('click', async () => {
-        adviceModal.style.display = 'block';
-        adviceContent.innerHTML = '<div style="text-align:center; padding: 2rem;">Thinking... 🧠</div>';
-
-        try {
-            const response = await fetch('/api/analyze');
-            const data = await response.json();
-
-            if (data.error) {
-                adviceContent.innerHTML = `<p style="color:red">Error: ${data.error}</p>`;
-            } else {
-                // Simple Markdown Parser
-                let html = data.analysis
-                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold
-                    .replace(/\n\s*-\s/g, '<br>• ') // Bullets
-                    .replace(/\n/g, '<br>'); // Newlines
-
-                adviceContent.innerHTML = html;
-            }
-        } catch (error) {
-            adviceContent.innerHTML = '<p style="color:red">Failed to get advice.</p>';
-        }
-    });
-
-    // Close modal when clicking outside (handled by existing window.onclick if id matches, but let's be safe)
-    // We need to update the existing window.onclick to handle both modals or check class
-    const existingOnClick = window.onclick;
     window.onclick = (event) => {
         if (event.target == document.getElementById('edit-modal')) {
             document.getElementById('edit-modal').style.display = "none";
-        }
-        if (event.target == adviceModal) {
-            adviceModal.style.display = "none";
         }
     };
 
