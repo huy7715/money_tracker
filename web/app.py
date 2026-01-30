@@ -74,18 +74,26 @@ def update_transaction(transaction_id):
 
 @app.route('/api/data')
 def get_data():
+    # Use standard month if not provided
+    month = request.args.get('month') # Format: YYYY-MM
     current_month = datetime.now().strftime("%Y-%m")
+    effective_month = month if month else current_month
     
     # Auto-process recurring savings
-    manager.check_recurring_contributions(current_month)
+    manager.check_recurring_contributions(effective_month)
     
-    # Return data strictly for current month as requested
-    balance = manager.get_balance(current_month)
-    transactions = manager.get_recent_transactions(current_month)
+    # Return data for selected month
+    balance = manager.get_balance(effective_month)
+    transactions = manager.get_recent_transactions(effective_month)
     return jsonify({
         'balance': balance,
         'transactions': [vars(t) for t in transactions]
     })
+
+@app.route('/api/available-months')
+def get_available_months():
+    months = manager.storage.get_available_months()
+    return jsonify(months)
 
 @app.route('/export')
 def export_data():

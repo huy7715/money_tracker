@@ -50,7 +50,13 @@
                     <input type="file" id="bg-input" accept="image/*" hidden>
                 </div>
                 <div class="balance-card">
-                    <h2>Monthly Balance</h2>
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <h2 style="margin: 0; font-size: 1.1rem; opacity: 0.9;">Monthly Balance</h2>
+                        <select id="month-selector" class="month-selector">
+                            <!-- Populated by JS -->
+                        </select>
+                    </div>
                     <div class="amount" id="balance-amount">{{ "{:,.0f}".format(balance) }} ₫</div>
                 </div>
             </header>
@@ -486,9 +492,13 @@
                         style="font-size: 0.85rem; color: #6b7280; margin-bottom: 0.8rem; display: flex; align-items: center; gap: 0.4rem;">
                         📅 Recent Notes
                     </h4>
-                    <div id="diary-history-list" style="display: flex; flex-direction: column; gap: 0.5rem;">
-                        <!-- History items will be injected here -->
-                        <p style="font-size: 0.75rem; color: #9ca3af; text-align: center;">No notes recorded yet</p>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        <input type="text" id="note-search" placeholder="Search notes (e.g. 2026-01)..."
+                            style="width: 100%; padding: 0.5rem; font-size: 0.8rem; border-radius: 0.4rem; border: 1px solid #e5e7eb; margin-bottom: 0.5rem; background: rgba(255,255,255,0.8);">
+                        <div id="diary-history-list" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                            <!-- History items will be injected here -->
+                            <p style="font-size: 0.75rem; color: #9ca3af; text-align: center;">No notes recorded yet</p>
+                        </div>
                     </div>
                 </div>
             </div>

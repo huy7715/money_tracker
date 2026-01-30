@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('transaction-form');
     const balanceAmount = document.getElementById('balance-amount');
+    const monthSelector = document.getElementById('month-selector');
     const transactionList = document.getElementById('transaction-list');
 
     // Chart instance
@@ -343,37 +344,68 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function loadDiaryHistory() {
         if (!diaryHistoryList) return;
+
+        const searchInput = document.getElementById('note-search');
+        if (searchInput && !searchInput.dataset.listenerAdded) {
+            searchInput.addEventListener('input', () => loadDiaryHistory());
+            searchInput.dataset.listenerAdded = 'true';
+        }
+
+        const searchTerm = searchInput ? searchInput.value.toLowerCase() : "";
+
         try {
             const response = await fetch('/api/diary/history');
             const data = await response.json();
 
             if (data.history && data.history.length > 0) {
+                // Filter history if search term is present
+                const filteredHistory = data.history.filter(date => date.includes(searchTerm));
+
+                if (filteredHistory.length === 0) {
+                    diaryHistoryList.innerHTML = '<p style="font-size: 0.75rem; color: #9ca3af; text-align: center;">No matching notes</p>';
+                    return;
+                }
+
                 diaryHistoryList.innerHTML = '';
-                data.history.forEach(date => {
-                    const btn = document.createElement('button');
-                    btn.className = 'history-item';
-                    btn.style.cssText = `
-                        background: #f9fafb;
-                        border: 1px solid #e5e7eb;
-                        padding: 0.6rem;
-                        border-radius: 0.5rem;
-                        font-size: 0.85rem;
-                        cursor: pointer;
-                        text-align: left;
-                        transition: all 0.2s;
-                        color: #374151;
-                        font-weight: 500;
-                        display: block;
-                        width: 100%;
-                    `;
-                    btn.onmouseover = () => btn.style.background = '#f3f4f6';
-                    btn.onmouseout = () => btn.style.background = '#f9fafb';
-                    btn.innerHTML = `<strong>${date}</strong>`;
-                    btn.onclick = () => {
-                        diaryDateInput.value = date;
-                        loadDiary(date);
-                    };
-                    diaryHistoryList.appendChild(btn);
+
+                // Group by Month/Year
+                const groups = {};
+                filteredHistory.forEach(dateStr => {
+                    const [year, month, day] = dateStr.split('-');
+                    const groupKey = `${year}-${month}`;
+                    if (!groups[groupKey]) groups[groupKey] = [];
+                    groups[groupKey].push(dateStr);
+                });
+
+                // Sort Years/Months Descending
+                const sortedGroupKeys = Object.keys(groups).sort().reverse();
+
+                sortedGroupKeys.forEach(groupKey => {
+                    const [year, month] = groupKey.split('-');
+                    const dateObj = new Date(year, month - 1, 1);
+                    const groupLabel = dateObj.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' });
+
+                    // Add group header
+                    const header = document.createElement('div');
+                    header.className = 'note-group-header';
+                    header.textContent = groupLabel;
+                    diaryHistoryList.appendChild(header);
+
+                    // Add items in this group
+                    groups[groupKey].forEach(date => {
+                        const day = date.split('-')[2];
+                        const btn = document.createElement('button');
+                        btn.className = 'note-item';
+                        btn.innerHTML = `
+                            <span>Note for ${date}</span>
+                            <span class="day-chip">Day ${day}</span>
+                        `;
+                        btn.onclick = () => {
+                            diaryDateInput.value = date;
+                            loadDiary(date);
+                        };
+                        diaryHistoryList.appendChild(btn);
+                    });
                 });
             } else {
                 diaryHistoryList.innerHTML = '<p style="font-size: 0.75rem; color: #9ca3af; text-align: center;">No notes recorded yet</p>';
@@ -448,10 +480,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ========== MAIN DATA FETCHING ==========
-    async function fetchData() {
-        console.log("Fetching new data from server...");
+    async function fetchData(month = null) {
+        console.log(`Fetching data for month: ${month || 'current'}...`);
         try {
-            const response = await fetch('/api/data');
+            const url = month ? `/api/data?month=${month}` : '/api/data';
+            const response = await fetch(url);
             const data = await response.json();
 
             if (!data) return;
@@ -517,6 +550,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initial fetch to load data on page start
     fetchData();
+
+    // Populate Month Selector and handle change
+    if (monthSelector) {
+        async function updateAvailableMonths() {
+            try {
+                const response = await fetch('/api/available-months');
+                const months = await response.json();
+
+                // Always ensure current month is in the list
+                const currentMonth = new Date().toISOString().substring(0, 7);
+                if (!months.includes(currentMonth)) {
+                    months.unshift(currentMonth);
+                }
+
+                // Clear and repopulate
+                monthSelector.innerHTML = '';
+                months.forEach(monthVal => {
+                    const [year, month] = monthVal.split('-');
+                    const date = new Date(year, month - 1, 1);
+                    const monthLabel = date.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' });
+
+                    const opt = document.createElement('option');
+                    opt.value = monthVal;
+                    opt.textContent = monthLabel;
+                    monthSelector.appendChild(opt);
+                });
+            } catch (e) {
+                console.error('Error fetching months:', e);
+            }
+        }
+
+        updateAvailableMonths();
+
+        monthSelector.addEventListener('change', (e) => {
+            fetchData(e.target.value);
+        });
+    }
 
     function updateChart(dataMap) {
         const ctxElement = document.getElementById('expenseChart');

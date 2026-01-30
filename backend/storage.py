@@ -389,6 +389,16 @@ class Storage:
         conn.commit()
         conn.close()
 
+    def get_available_months(self):
+        """Returns a list of unique months (YYYY-MM) that have transactions"""
+        conn = self._get_conn()
+        cursor = conn.cursor()
+        # Extract YYYY-MM from date strings like 'YYYY-MM-DD HH:MM:SS'
+        cursor.execute("SELECT DISTINCT substr(date, 1, 7) as month FROM transactions ORDER BY month DESC")
+        months = [row['month'] for row in cursor.fetchall() if row['month']]
+        conn.close()
+        return months
+
 
 
 
