@@ -169,6 +169,19 @@ class Storage:
             
             return income - expense
 
+    def get_all_time_stats(self):
+        with self._conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT SUM(amount) FROM transactions WHERE type='income'")
+            res_income = cursor.fetchone()
+            income = res_income[0] if res_income and res_income[0] is not None else 0.0
+            
+            cursor.execute("SELECT SUM(amount) FROM transactions WHERE type='expense'")
+            res_expense = cursor.fetchone()
+            expense = res_expense[0] if res_expense and res_expense[0] is not None else 0.0
+            
+            return {"income": income, "expense": expense}
+
     def get_transaction(self, transaction_id):
         with self._conn() as conn:
             cursor = conn.cursor()

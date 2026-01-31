@@ -47,6 +47,9 @@ class FinanceManager:
     def get_balance(self, month=None):
         return self.storage.get_balance(month)
 
+    def get_all_time_stats(self):
+        return self.storage.get_all_time_stats()
+
     def delete_transaction(self, transaction_id):
         # 1. Fetch transaction details before deletion
         transaction = self.storage.get_transaction(transaction_id)

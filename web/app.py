@@ -85,9 +85,11 @@ def get_data():
     # Return data for selected month
     balance = manager.get_balance(effective_month)
     transactions = manager.get_recent_transactions(effective_month)
+    all_time = manager.get_all_time_stats()
     return jsonify({
         'balance': balance,
-        'transactions': [vars(t) for t in transactions]
+        'transactions': [vars(t) for t in transactions],
+        'all_time': all_time
     })
 
 @app.route('/api/available-months')
@@ -158,6 +160,21 @@ def ai_parse():
         from money_tracker.backend.ai_service import AIService
         ai_service = AIService()
         result = ai_service.parse_transaction(text) # Uses backward compatibility method
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/ai/bulk-extract', methods=['POST'])
+def ai_bulk_extract():
+    data = request.json
+    text = data.get('text')
+    if not text:
+        return jsonify({'error': 'No text provided'}), 400
+    
+    try:
+        from money_tracker.backend.ai_service import AIService
+        ai_service = AIService()
+        result = ai_service.extract_bulk_transactions(text)
         return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500

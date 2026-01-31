@@ -533,7 +533,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 balanceAmount.textContent = `${(data.balance || 0).toLocaleString('vi-VN')} ₫`;
             }
 
-            // Update Stats in Sidebar
+            // Update All-Time Stats in Sidebar
+            if (data.all_time) {
+                const totalIncomeStat = document.getElementById('total-income-stat');
+                const totalExpenseStat = document.getElementById('total-expense-stat');
+                if (totalIncomeStat) totalIncomeStat.textContent = `${Number(data.all_time.income || 0).toLocaleString('vi-VN')} ₫`;
+                if (totalExpenseStat) totalExpenseStat.textContent = `${Number(data.all_time.expense || 0).toLocaleString('vi-VN')} ₫`;
+            }
+
+            // Update Stats in Sidebar (Selected Month)
             if (Array.isArray(data.transactions)) {
                 updateSidebarStats(data.transactions, effectiveMonth);
 
@@ -616,11 +624,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     monthSelector.appendChild(opt);
                 });
 
-                // Set default value to current month
-                monthSelector.value = currentMonth;
+                // Set default value to saved month OR current month
+                const savedMonth = localStorage.getItem('selectedMonth');
+                if (savedMonth && months.includes(savedMonth)) {
+                    monthSelector.value = savedMonth;
+                } else {
+                    monthSelector.value = currentMonth;
+                    localStorage.setItem('selectedMonth', currentMonth);
+                }
 
-                // Initial fetch for the default month
-                fetchData(currentMonth);
+                // Initial fetch for the settled month
+                fetchData(monthSelector.value);
 
             } catch (e) {
                 console.error('Error fetching months:', e);
@@ -632,7 +646,9 @@ document.addEventListener('DOMContentLoaded', () => {
         updateAvailableMonths();
 
         monthSelector.addEventListener('change', (e) => {
-            fetchData(e.target.value);
+            const selectedMonth = e.target.value;
+            localStorage.setItem('selectedMonth', selectedMonth);
+            fetchData(selectedMonth);
         });
     }
 
@@ -1188,6 +1204,170 @@ document.addEventListener('DOMContentLoaded', () => {
             if (loading) loading.textContent = 'Failed to load assets.';
         }
     }
+
+    // --- Bulk AI Import Logic ---
+    let detectedTransactions = [];
+    const bulkModal = document.getElementById('bulk-modal');
+    const bulkInputStep = document.getElementById('bulk-input-step');
+    const bulkReviewStep = document.getElementById('bulk-review-step');
+    const bulkLoading = document.getElementById('bulk-loading');
+    const bulkTableBody = document.getElementById('bulk-review-table-body');
+    const bulkCountBadge = document.getElementById('bulk-count-badge');
+
+    window.openBulkModal = () => {
+        bulkModal.style.display = 'block';
+        backToBulkInput();
+    };
+
+    window.closeBulkModal = () => {
+        bulkModal.style.display = 'none';
+    };
+
+    window.backToBulkInput = () => {
+        bulkInputStep.style.display = 'block';
+        bulkReviewStep.style.display = 'none';
+        bulkLoading.style.display = 'none';
+    };
+
+    document.getElementById('bulk-ai-btn')?.addEventListener('click', openBulkModal);
+
+    document.getElementById('bulk-extract-btn')?.addEventListener('click', async () => {
+        const text = document.getElementById('bulk-text-input').value;
+        if (!text.trim()) return alert("Please paste some text first!");
+
+        if (text.length > 50000) {
+            if (!confirm("This is a very long text. Analysis might take longer or hit limits. Continue?")) return;
+        }
+
+        bulkInputStep.style.display = 'none';
+        bulkLoading.style.display = 'block';
+
+        try {
+            const response = await fetch('/api/ai/bulk-extract', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text })
+            });
+            const data = await response.json();
+
+            if (data.transactions) {
+                detectedTransactions = data.transactions;
+                renderBulkReview();
+                bulkLoading.style.display = 'none';
+                bulkReviewStep.style.display = 'block';
+            } else {
+                alert(data.error || "Could not extract transactions.");
+                backToBulkInput();
+            }
+        } catch (error) {
+            console.error('Bulk extraction failed:', error);
+            alert("An error occurred during scanning.");
+            backToBulkInput();
+        }
+    });
+
+    function renderBulkReview() {
+        bulkTableBody.innerHTML = '';
+        if (detectedTransactions.length === 0) {
+            bulkTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 2rem; color: #94a3b8;">No transactions found in this text.</td></tr>';
+            return;
+        }
+
+        const standardCats = ["Food", "Rent", "Utilities", "Transport", "Groceries", "Shopping", "Entertainment", "Travel", "Health", "Salary", "Bonus", "Investment", "Other Income", "Other"];
+
+        detectedTransactions.forEach((t, index) => {
+            const row = document.createElement('tr');
+            row.style.borderBottom = '1px solid #f1f5f9';
+
+            // Normalize category if AI hallucinated
+            const cat = standardCats.includes(t.category) ? t.category : "Other";
+
+            row.innerHTML = `
+                <td style="padding: 0.75rem;"><input type="checkbox" class="bulk-item-check" data-index="${index}" checked></td>
+                <td style="padding: 0.5rem;"><input type="date" class="bulk-edit-date" data-index="${index}" value="${t.date}" style="border:1px solid #e2e8f0; padding:0.2rem; border-radius:0.3rem; font-size:0.8rem;"></td>
+                <td style="padding: 0.5rem;">
+                    <input type="text" class="bulk-edit-desc" data-index="${index}" value="${t.description}" style="width:100%; border:1px solid #e2e8f0; padding:0.2rem; border-radius:0.3rem; font-size:0.8rem;">
+                    <div style="font-size:0.7rem; color:#94a3b8; margin-top:0.2rem; font-style:italic;">Source: "${t.original_snippet || 'N/A'}"</div>
+                </td>
+                <td style="padding: 0.5rem;">
+                    <select class="bulk-edit-cat" data-index="${index}" style="border:1px solid #e2e8f0; padding:0.2rem; border-radius:0.3rem; font-size:0.8rem;">
+                        ${standardCats.map(c => `<option value="${c}" ${cat === c ? 'selected' : ''}>${c}</option>`).join('')}
+                    </select>
+                </td>
+                <td style="padding: 0.5rem; text-align: right;">
+                    <div style="display:flex; align-items:center; justify-content:flex-end; gap:0.2rem;">
+                        <span style="font-weight:700; color: ${t.type === 'expense' ? '#ef4444' : '#10b981'};">${t.type === 'expense' ? '-' : '+'}</span>
+                        <input type="number" class="bulk-edit-amount" data-index="${index}" value="${t.amount}" style="width:80px; border:1px solid #e2e8f0; padding:0.2rem; border-radius:0.3rem; font-size:0.8rem; text-align:right;">
+                    </div>
+                </td>
+            `;
+            bulkTableBody.appendChild(row);
+        });
+        updateBulkCount();
+    }
+
+    function updateBulkCount() {
+        const checked = document.querySelectorAll('.bulk-item-check:checked').length;
+        bulkCountBadge.textContent = checked;
+    }
+
+    document.getElementById('bulk-select-all')?.addEventListener('change', (e) => {
+        document.querySelectorAll('.bulk-item-check').forEach(cb => cb.checked = e.target.checked);
+        updateBulkCount();
+    });
+
+    bulkTableBody.addEventListener('change', (e) => {
+        if (e.target.classList.contains('bulk-item-check')) updateBulkCount();
+    });
+
+    document.getElementById('bulk-confirm-btn')?.addEventListener('click', async () => {
+        const checks = document.querySelectorAll('.bulk-item-check:checked');
+        if (checks.length === 0) return alert("No transactions selected!");
+
+        const btn = document.getElementById('bulk-confirm-btn');
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.textContent = "Saving...";
+
+        const toSave = [];
+        checks.forEach(cb => {
+            const idx = cb.dataset.index;
+            const row = cb.closest('tr');
+            toSave.push({
+                date: row.querySelector('.bulk-edit-date').value,
+                description: row.querySelector('.bulk-edit-desc').value,
+                category: row.querySelector('.bulk-edit-cat').value,
+                amount: parseFloat(row.querySelector('.bulk-edit-amount').value),
+                type: detectedTransactions[idx].type // Keep original type
+            });
+        });
+
+        try {
+            let successCount = 0;
+            for (const t of toSave) {
+                const res = await fetch('/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(t)
+                });
+                if (res.ok) successCount++;
+            }
+            alert(`Successfully imported ${successCount} transactions!`);
+            closeBulkModal();
+            fetchData(); // Refresh main list
+        } catch (error) {
+            console.error('Error saving bulk:', error);
+            alert("Error while saving transactions.");
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    });
+
+    window.onclick = (event) => {
+        if (event.target == bulkModal) closeBulkModal();
+        if (event.target == document.getElementById('edit-modal')) closeModal();
+    };
 });
 
 

@@ -133,4 +133,71 @@ class AIService:
             return {"error": "Only transactions are supported on this endpoint"}
         return result
 
+    def extract_bulk_transactions(self, text):
+        current_time = datetime.datetime.now().isoformat()
+        current_month = datetime.datetime.now().strftime("%Y-%m")
+        
+        prompt = f"""
+        Extract all financial transactions (income and expenses) from the following text:
+        ---
+        "{text}"
+        ---
+        Current Date/Time: {current_time}
+        Current Month: {current_month}
+
+        INSTRUCTIONS:
+        1. Identify the date for each transaction. Diary entries often start with a date (e.g. "12/1/2025" or "1/2"). Detect these patterns. 
+        2. If a date is missing year (e.g. "12/1"), assume the year is 2025 or current based on context.
+        3. If no date is found top-level, use the current month/year for the transaction date.
+        4. Extract: amount, category, type (expense/income), description, and original_snippet.
+        5. Handle Vietnamese Currency suffixes precisely:
+           - "ngàn", "nghìn", "k" -> x1,000
+           - "triệu", "tr", "m" -> x1,000,000 (e.g., "1tr923k" -> 1923000)
+           - "tỷ" -> x1,000,000,000
+        6. Determine Transaction Type:
+           - Look for keywords like "chi", "tốn", "hết", "mất", "mua", "trả", or negative signs ("-90k") -> type: expense
+           - Look for keywords like "nhận", "lương", "thưởng", "được cho", "hồi lại", "thu về" -> type: income
+        7. Categories: Food, Rent, Utilities, Transport, Groceries, Shopping, Entertainment, Travel, Health, Salary, Bonus, Investment, Other.
+        8. Return ONLY a JSON object with a key "transactions" which is a list of objects.
+
+        JSON structure for each transaction:
+        {{
+            "amount": number,
+            "category": string,
+            "type": "expense" or "income",
+            "description": string,
+            "date": "YYYY-MM-DD",
+            "original_snippet": string (the exact words from the text that triggered this transaction)
+        }}
+
+        Example:
+        - Input: "12/1: Sáng ăn phở 50k. Chiều được trả nợ 200k."
+        - Output: {{"transactions": [
+            {{"amount": 50000, "category": "Food", "type": "expense", "description": "Sáng ăn phở", "date": "2025-01-12", "original_snippet": "Sáng ăn phở 50k"}},
+            {{"amount": 200000, "category": "Other Income", "type": "income", "description": "Chiều được trả nợ", "date": "2025-01-12", "original_snippet": "Chiều được trả nợ 200k"}}
+        ]}}
+        """
+
+        provider = self.get_active_provider()
+        try:
+            if provider == "openai":
+                if not self.openai_client: return {"error": "OpenAI not configured"}
+                response = self.openai_client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[
+                        {"role": "system", "content": "You are a specialized financial data extractor. Always return valid JSON."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    response_format={"type": "json_object"}
+                )
+                content = response.choices[0].message.content.strip()
+            else:
+                if not self.gemini_model: return {"error": "Gemini not configured"}
+                response = self.gemini_model.generate_content(prompt)
+                content = response.text.replace('```json', '').replace('```', '').strip()
+            
+            return json.loads(content)
+        except Exception as e:
+            return {"error": str(e)}
+
 

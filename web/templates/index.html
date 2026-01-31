@@ -23,6 +23,14 @@
                     <strong id="month-spent-stat">0 ₫</strong>
                 </div>
                 <div class="stat-item">
+                    <span>Total Revenue</span>
+                    <strong id="total-income-stat" style="color: #10b981;">0 ₫</strong>
+                </div>
+                <div class="stat-item">
+                    <span>Total Spending</span>
+                    <strong id="total-expense-stat" style="color: #ef4444;">0 ₫</strong>
+                </div>
+                <div class="stat-item">
                     <span>Transactions</span>
                     <strong id="tx-count-stat">0</strong>
                 </div>
@@ -249,15 +257,18 @@
                     <div
                         style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                         <h3 style="margin: 0;">✨ Magic Assistant</h3>
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <select id="model-selector"
-                                style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 0.5rem; padding: 0.2rem 0.4rem; font-size: 0.75rem; outline: none; cursor: pointer;">
-                                <option value="openai" style="color: black;">OpenAI</option>
-                                <option value="gemini" style="color: black;">Gemini</option>
-                            </select>
-                            <span id="ai-model-badge"
-                                style="background: rgba(255,255,255,0.2); padding: 0.2rem 0.6rem; border-radius: 1rem; font-size: 0.75rem; border: 1px solid rgba(255,255,255,0.3); font-weight: 500;">Loading
-                                AI...</span>
+                        <div style="display: flex; align-items: center; gap: 0.8rem;">
+                            <button id="bulk-ai-btn" title="Bulk Import from Text"
+                                style="background: rgba(255,255,255,0.2); color: white; border: none; border-radius: 0.5rem; padding: 0.4rem 0.8rem; font-size: 0.75rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.3rem;">
+                                📋 Bulk Scan
+                            </button>
+                            <div style="display: flex; align-items: center; gap: 0.3rem; margin-left: 0.5rem;">
+                                <select id="model-selector"
+                                    style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 0.5rem; padding: 0.2rem 0.4rem; font-size: 0.75rem; outline: none; cursor: pointer;">
+                                    <option value="openai" style="color: black;">OpenAI</option>
+                                    <option value="gemini" style="color: black;">Gemini</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                     <p style="margin-bottom: 1rem; opacity: 0.9;">"Spent 50k on coffee", "Salary 20m", or "Set food
@@ -560,6 +571,68 @@
                 </div>
                 <button type="submit">Save Changes</button>
             </form>
+        </div>
+    </div>
+    <!-- Bulk Import Modal -->
+    <div id="bulk-modal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <span class="close-btn" onclick="closeBulkModal()">&times;</span>
+            <h3 style="display: flex; align-items: center; gap: 0.5rem;">✨ AI Bulk Transaction Extraction</h3>
+
+            <div id="bulk-input-step">
+                <p style="font-size: 0.9rem; color: #64748b; margin-bottom: 1rem;">
+                    Paste your diary, notes, or chat history below. AI will automatically find all transactions and
+                    dates.
+                </p>
+                <textarea id="bulk-text-input" placeholder="Example:
+12/1/2025: Spent 50k on lunch. 
+15/1/2025: Received salary 20m..."
+                    style="width: 100%; height: 300px; padding: 1rem; border: 1px solid #e2e8f0; border-radius: 0.75rem; font-family: 'Inter', sans-serif; font-size: 0.95rem; margin-bottom: 1rem; outline: none; transition: border-color 0.2s;"></textarea>
+                <button id="bulk-extract-btn"
+                    style="background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); font-weight: 700;">
+                    Scan Text with AI ✨
+                </button>
+            </div>
+
+            <div id="bulk-review-step" style="display: none;">
+                <p style="font-size: 0.9rem; color: #64748b; margin-bottom: 1rem;">
+                    Review the detected transactions. Uncheck any you don't want to import.
+                </p>
+                <div
+                    style="max-height: 400px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 0.75rem; margin-bottom: 1.5rem;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                        <thead style="background: #f8fafc; position: sticky; top: 0; z-index: 1;">
+                            <tr>
+                                <th style="padding: 0.75rem; border-bottom: 1px solid #e2e8f0; text-align: left;"><input
+                                        type="checkbox" id="bulk-select-all" checked></th>
+                                <th style="padding: 0.75rem; border-bottom: 1px solid #e2e8f0; text-align: left;">Date
+                                </th>
+                                <th style="padding: 0.75rem; border-bottom: 1px solid #e2e8f0; text-align: left;">
+                                    Description</th>
+                                <th style="padding: 0.75rem; border-bottom: 1px solid #e2e8f0; text-align: left;">
+                                    Category</th>
+                                <th style="padding: 0.75rem; border-bottom: 1px solid #e2e8f0; text-align: right;">
+                                    Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bulk-review-table-body">
+                            <!-- Rows injected by JS -->
+                        </tbody>
+                    </table>
+                </div>
+                <div style="display: flex; gap: 1rem;">
+                    <button onclick="backToBulkInput()"
+                        style="background: #f1f5f9; color: #475569; font-weight: 600;">Back</button>
+                    <button id="bulk-confirm-btn" style="background: #10b981; font-weight: 700;">Import <span
+                            id="bulk-count-badge">0</span> Transactions</button>
+                </div>
+            </div>
+
+            <div id="bulk-loading" style="display: none; text-align: center; padding: 3rem 0;">
+                <div style="animation: spin 1s linear infinite; font-size: 3rem; margin-bottom: 1rem;">⏳</div>
+                <p style="font-weight: 600; color: var(--primary);">AI is analyzing your notes...</p>
+                <p style="font-size: 0.8rem; color: #94a3b8;">This may take 10-20 seconds for long texts.</p>
+            </div>
         </div>
     </div>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>

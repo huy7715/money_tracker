@@ -101,10 +101,18 @@
             return Number(num).toLocaleString('vi-VN');
         }
 
-        // Set default month to current month
+        // Set default month: check localStorage, then fallback to current month
         const monthSelector = document.getElementById('month-selector');
+        const savedMonth = localStorage.getItem('selectedMonth');
         const now = new Date();
-        monthSelector.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+        monthSelector.value = savedMonth || currentMonth;
+
+        // Update localStorage when changed on this page too
+        monthSelector.addEventListener('change', () => {
+            localStorage.setItem('selectedMonth', monthSelector.value);
+        });
 
         let categoryChart = null;
 
