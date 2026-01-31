@@ -4,6 +4,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const monthSelector = document.getElementById('month-selector');
     const transactionList = document.getElementById('transaction-list');
 
+    // Utility: Debounce function
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
     // Chart instance
     let expenseChart = null;
 
@@ -330,11 +343,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function loadDiary(date) {
         if (!diaryContent) return;
+        const diaryTitle = document.getElementById('diary-title');
         diaryContent.placeholder = "Loading your thoughts...";
+        if (diaryTitle) diaryTitle.value = "";
+
         try {
             const response = await fetch(`/api/diary?date=${date}`);
             const data = await response.json();
             diaryContent.value = data.content || "";
+            if (diaryTitle) diaryTitle.value = data.title || "";
             diaryContent.placeholder = "Share your thoughts for today...";
         } catch (error) {
             console.error('Error loading diary:', error);
@@ -347,7 +364,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const searchInput = document.getElementById('note-search');
         if (searchInput && !searchInput.dataset.listenerAdded) {
-            searchInput.addEventListener('input', () => loadDiaryHistory());
+            const debouncedLoad = debounce(() => loadDiaryHistory(), 250);
+            searchInput.addEventListener('input', debouncedLoad);
             searchInput.dataset.listenerAdded = 'true';
         }
 
@@ -359,7 +377,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (data.history && data.history.length > 0) {
                 // Filter history if search term is present
-                const filteredHistory = data.history.filter(date => date.includes(searchTerm));
+                // item is now {date, title}
+                const filteredHistory = data.history.filter(item => {
+                    const dateMatch = item.date.includes(searchTerm);
+                    const titleMatch = item.title && item.title.toLowerCase().includes(searchTerm);
+                    return dateMatch || titleMatch;
+                });
 
                 if (filteredHistory.length === 0) {
                     diaryHistoryList.innerHTML = '<p style="font-size: 0.75rem; color: #9ca3af; text-align: center;">No matching notes</p>';
@@ -370,11 +393,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Group by Month/Year
                 const groups = {};
-                filteredHistory.forEach(dateStr => {
+                filteredHistory.forEach(item => {
+                    const dateStr = item.date;
                     const [year, month, day] = dateStr.split('-');
                     const groupKey = `${year}-${month}`;
                     if (!groups[groupKey]) groups[groupKey] = [];
-                    groups[groupKey].push(dateStr);
+                    groups[groupKey].push(item);
                 });
 
                 // Sort Years/Months Descending
@@ -392,12 +416,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     diaryHistoryList.appendChild(header);
 
                     // Add items in this group
-                    groups[groupKey].forEach(date => {
+                    groups[groupKey].forEach(item => {
+                        const date = item.date;
+                        const title = item.title;
                         const day = date.split('-')[2];
                         const btn = document.createElement('button');
                         btn.className = 'note-item';
+
+                        // Use title if provided, otherwise default to "Note for [Date]"
+                        const displayTitle = title && title.trim() ? title : `Note for ${date}`;
+
                         btn.innerHTML = `
-                            <span>Note for ${date}</span>
+                            <span style="font-weight: 500;">${displayTitle}</span>
                             <span class="day-chip">Day ${day}</span>
                         `;
                         btn.onclick = () => {
@@ -418,6 +448,8 @@ document.addEventListener('DOMContentLoaded', () => {
     saveDiaryBtn?.addEventListener('click', async () => {
         const date = diaryDateInput.value;
         const content = diaryContent.value;
+        const diaryTitle = document.getElementById('diary-title');
+        const title = diaryTitle ? diaryTitle.value : "";
         if (!date) return;
 
         saveDiaryBtn.textContent = "Saving...";
@@ -427,7 +459,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/api/diary', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ date, content })
+                body: JSON.stringify({ date, content, title })
             });
             if (response.ok) {
                 saveDiaryBtn.textContent = "Saved! ✓";
@@ -450,7 +482,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // ========== SIDEBAR STATS ==========
-    async function updateSidebarStats(transactions) {
+    async function updateSidebarStats(transactions, monthOverride = null) {
         const spentStat = document.getElementById('month-spent-stat');
         const countStat = document.getElementById('tx-count-stat');
         if (!spentStat || !countStat) return;
@@ -458,7 +490,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const now = new Date();
         const year = now.getFullYear();
         const month = String(now.getMonth() + 1).padStart(2, '0');
-        const currentMonthPrefix = `${year}-${month}`;
+        const currentMonthPrefix = monthOverride || `${year}-${month}`;
 
         console.log("Filtering for month:", currentMonthPrefix);
 
@@ -481,16 +513,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ========== MAIN DATA FETCHING ==========
     async function fetchData(month = null) {
-        console.log(`Fetching data for month: ${month || 'current'}...`);
+        // If no month provided, use current month as default
+        const currentMonth = new Date().toISOString().substring(0, 7);
+        const effectiveMonth = month || currentMonth;
+
+        console.log(`Fetching data for month: ${effectiveMonth}...`);
         try {
-            const url = month ? `/api/data?month=${month}` : '/api/data';
+            const url = `/api/data?month=${effectiveMonth}`;
             const response = await fetch(url);
             const data = await response.json();
 
             if (!data) return;
 
-            // Fetch assets
-            fetchAssets();
+            // Fetch assets for the selected month
+            fetchAssets(effectiveMonth);
 
             // Update balance
             if (balanceAmount) {
@@ -499,7 +535,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Update Stats in Sidebar
             if (Array.isArray(data.transactions)) {
-                updateSidebarStats(data.transactions);
+                updateSidebarStats(data.transactions, effectiveMonth);
 
                 // Process data for Chart
                 const chartData = {};
@@ -541,7 +577,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Refresh budget status
             if (typeof fetchBudgetStatus === 'function') {
-                await fetchBudgetStatus();
+                await fetchBudgetStatus(effectiveMonth);
             }
         } catch (error) {
             console.error('Error in fetchData:', error);
@@ -549,7 +585,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Initial fetch to load data on page start
-    fetchData();
+    // We will call this AFTER populating the month selector to ensure consistency
+    // fetchData();
 
     // Populate Month Selector and handle change
     if (monthSelector) {
@@ -562,6 +599,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const currentMonth = new Date().toISOString().substring(0, 7);
                 if (!months.includes(currentMonth)) {
                     months.unshift(currentMonth);
+                    // Sort again to maintain order
+                    months.sort().reverse();
                 }
 
                 // Clear and repopulate
@@ -576,8 +615,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     opt.textContent = monthLabel;
                     monthSelector.appendChild(opt);
                 });
+
+                // Set default value to current month
+                monthSelector.value = currentMonth;
+
+                // Initial fetch for the default month
+                fetchData(currentMonth);
+
             } catch (e) {
                 console.error('Error fetching months:', e);
+                // Fallback initial fetch if selector fails
+                fetchData();
             }
         }
 
@@ -620,29 +668,32 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         if (expenseChart) {
-            expenseChart.destroy();
-        }
-
-        expenseChart = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: labels,
-                datasets: [{
-                    data: dataValues,
-                    backgroundColor: backgroundColors,
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'right',
+            expenseChart.data.labels = labels;
+            expenseChart.data.datasets[0].data = dataValues;
+            expenseChart.data.datasets[0].backgroundColor = backgroundColors;
+            expenseChart.update();
+        } else {
+            expenseChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: dataValues,
+                        backgroundColor: backgroundColors,
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                        }
                     }
                 }
-            }
-        });
+            });
+        }
     }
 
     // Expose functions to global scope
@@ -831,9 +882,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Fetch and Display Budget Status
-    async function fetchBudgetStatus() {
+    async function fetchBudgetStatus(month = null) {
         try {
-            const response = await fetch('/api/budget-status');
+            const url = month ? `/api/budget-status?month=${month}` : '/api/budget-status';
+            const response = await fetch(url);
             const budgets = await response.json();
 
             if (!budgetList) return;
@@ -968,13 +1020,14 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchBudgetStatus();
 
     // ========== ASSETS & SAVINGS LOGIC ==========
-    async function fetchAssets() {
+    async function fetchAssets(month = null) {
         const loading = document.getElementById('assets-loading');
         const content = document.getElementById('assets-content');
         if (!loading || !content) return;
 
         try {
-            const response = await fetch('/api/assets');
+            const url = month ? `/api/assets?month=${month}` : '/api/assets';
+            const response = await fetch(url);
             const assets = await response.json();
 
             loading.style.display = 'none';

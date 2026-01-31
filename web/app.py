@@ -16,8 +16,8 @@ def index():
     # User request: "Total Balance" should show only specific month usage (Net Income)
     current_month = datetime.now().strftime("%Y-%m")
     
-    # Auto-process recurring savings
-    manager.check_recurring_contributions(current_month)
+    # Auto-process recurring savings (ALWAYS for real current month)
+    manager.check_recurring_contributions(datetime.now().strftime("%Y-%m"))
 
     # Calculate monthly net income
     balance = manager.get_balance(current_month)
@@ -79,8 +79,8 @@ def get_data():
     current_month = datetime.now().strftime("%Y-%m")
     effective_month = month if month else current_month
     
-    # Auto-process recurring savings
-    manager.check_recurring_contributions(effective_month)
+    # Auto-process recurring savings (ALWAYS for real current month)
+    manager.check_recurring_contributions(current_month)
     
     # Return data for selected month
     balance = manager.get_balance(effective_month)
@@ -92,7 +92,7 @@ def get_data():
 
 @app.route('/api/available-months')
 def get_available_months():
-    months = manager.storage.get_available_months()
+    months = manager.get_available_months()
     return jsonify(months)
 
 @app.route('/export')
@@ -254,8 +254,8 @@ def get_diary():
         date = request.args.get('date')
         if not date:
             return jsonify({'error': 'No date provided'}), 400
-        content = manager.get_diary(date)
-        return jsonify({'content': content})
+        result = manager.get_diary(date)
+        return jsonify(result) # result is {'content': ..., 'title': ...}
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -265,9 +265,10 @@ def save_diary():
         data = request.json
         date = data.get('date')
         content = data.get('content')
+        title = data.get('title')
         if not date:
             return jsonify({'error': 'No date provided'}), 400
-        manager.save_diary(date, content)
+        manager.save_diary(date, content, title)
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -283,7 +284,8 @@ def get_diary_history():
 @app.route('/api/assets', methods=['GET'])
 def get_assets():
     try:
-        assets = manager.get_assets()
+        month = request.args.get('month')
+        assets = manager.get_assets(month)
         return jsonify(assets)
     except Exception as e:
         return jsonify({'error': str(e)}), 500

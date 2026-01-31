@@ -165,8 +165,8 @@ class FinanceManager:
             'transactions': [t.__dict__ for t in transactions]
         }
 
-    def save_diary(self, date, content):
-        return self.storage.save_diary(date, content)
+    def save_diary(self, date, content, title=None):
+        return self.storage.save_diary(date, content, title)
 
     def get_diary(self, date):
         return self.storage.get_diary(date)
@@ -174,40 +174,52 @@ class FinanceManager:
     def get_diary_history(self):
         return self.storage.get_diary_history()
 
-    def get_assets(self):
-        return self.storage.get_assets()
+    def get_assets(self, month=None):
+        assets = self.storage.get_assets()
+        
+        if month:
+            # If a month is provided, calculate the balance as of the end of that month
+            for asset in assets:
+                adjustment = self.storage.get_asset_balance_adjustment_after(asset['id'], month)
+                # Balance(Month) = CurrentBalance - ChangesMadeAfterMonth
+                asset['amount'] = asset['amount'] - adjustment
+                
+        return assets
 
-    def check_recurring_contributions(self, current_month):
+    def check_recurring_contributions(self, real_current_month):
         """
         Check and process auto-contributions for the given month (YYYY-MM).
-        If an asset has auto_contribution > 0 and last_updated_month < current_month,
-        1. Add Expense Transaction (Deduct from Income context)
-        2. Increase Asset Amount
-        3. Update last_updated_month
+        Only triggers if last_updated_month < real_current_month.
         """
         assets = self.storage.get_assets()
+        any_processed = False
         for asset in assets:
-            if asset['auto_contribution'] > 0:
+            if asset.get('auto_contribution', 0) > 0:
                 last_month = asset['last_updated_month']
-                # If never updated or older than current month
-                if not last_month or last_month < current_month:
+                
+                # If never updated or older than real current month
+                if not last_month or last_month < real_current_month:
                     # Perform Contribution
-                    print(f"Processing recurring contribution for {asset['name']} in {current_month}")
+                    print(f"Processing recurring contribution for {asset['name']} in {real_current_month}")
                     
-                    # 1. Add Transaction
+                    # 1. Add Transaction (Linked to asset)
                     self.add_transaction(
                         amount=asset['auto_contribution'],
                         category="Savings",
                         type="expense",
                         description=f"Auto-deposit to {asset['name']}",
-                        date=f"{current_month}-01" # Default to 1st of month
+                        date=f"{real_current_month}-01 00:00:01",
+                        asset_id=asset['id']
                     )
                     
                     # 2. Update Asset
                     new_amount = asset['amount'] + asset['auto_contribution']
-                    self.storage.update_asset_balance(asset['id'], new_amount, current_month)
-                    return True # Processed something
-        return False
+                    self.storage.update_asset_balance(asset['id'], new_amount, real_current_month)
+                    any_processed = True
+        return any_processed
+
+    def get_available_months(self):
+        return self.storage.get_available_months()
 
 
 

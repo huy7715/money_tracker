@@ -1,5 +1,6 @@
 import sqlite3
 import os
+from contextlib import contextmanager
 from .models import Transaction, Budget
 
 class Storage:
@@ -7,7 +8,17 @@ class Storage:
         self.db_path = db_path
         self.init_db()
 
+    @contextmanager
+    def _conn(self):
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        try:
+            yield conn
+        finally:
+            conn.close()
+
     def _get_conn(self):
+        """Deprecated: Use _conn() context manager instead"""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         return conn
@@ -44,15 +55,17 @@ class Storage:
             CREATE TABLE IF NOT EXISTS diary (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 date TEXT UNIQUE NOT NULL,
-                content TEXT NOT NULL
+                content TEXT NOT NULL,
+                title TEXT
             )
         ''')
+        # Add title column if it doesn't exist
+        try:
+            cursor.execute("ALTER TABLE diary ADD COLUMN title TEXT")
+        except sqlite3.OperationalError:
+            pass # Column already exists
         
-        # New: Assets Table (Cash, Bank, Savings)
-        # Force Drop to ensure schema update and data fix (since it's a new feature with seed data only)
-        # In production, we would use ALTER TABLE, but here we want to reset the incorrect seed data.
-        cursor.execute("DROP TABLE IF EXISTS assets")
-        
+        # Assets Table (Cash, Bank, Savings)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS assets (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -94,310 +107,328 @@ class Storage:
             # Auto-contribution set to 2,000,000
             # last_updated_month set to '2026-01' so it doesn't trigger again for this Jan.
             cursor.execute('''
-                INSERT INTO assets (name, type, amount, interest_rate, end_date, start_date, auto_contribution, last_updated_month) 
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ''', ("Cumulative Fund", "Cumulative", 3000000, 5.2, "2027-01-29", "2026-01-29", 2000000, "2026-01"))
+        
+        # Performance Indexes
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_transactions_asset ON transactions(asset_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_diary_date ON diary(date)")
 
         conn.commit()
         conn.close()
 
     def add_transaction(self, transaction: Transaction):
-        conn = self._get_conn()
-        cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO transactions (amount, category, type, description, date, asset_id)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (transaction.amount, transaction.category, transaction.type, transaction.description, transaction.date, transaction.asset_id))
-        transaction.id = cursor.lastrowid
-        conn.commit()
-        conn.close()
-        return transaction
+        with self._conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO transactions (amount, category, type, description, date, asset_id)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (transaction.amount, transaction.category, transaction.type, transaction.description, transaction.date, transaction.asset_id))
+            transaction.id = cursor.lastrowid
+            conn.commit()
+            return transaction
 
     def get_transactions(self):
-        conn = self._get_conn()
-        cursor = conn.cursor()
-        cursor.execute('SELECT * FROM transactions ORDER BY date DESC')
-        rows = cursor.fetchall()
-        conn.close()
-        transactions = []
-        for row in rows:
-            transactions.append(Transaction(
-                id=row['id'],
-                amount=row['amount'],
-                category=row['category'],
-                type=row['type'],
-                description=row['description'],
-                date=row['date'],
-                asset_id=row['asset_id'] if 'asset_id' in row.keys() else None
-            ))
-        return transactions
+        with self._conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM transactions ORDER BY date DESC')
+            rows = cursor.fetchall()
+            transactions = []
+            for row in rows:
+                transactions.append(Transaction(
+                    id=row['id'],
+                    amount=row['amount'],
+                    category=row['category'],
+                    type=row['type'],
+                    description=row['description'],
+                    date=row['date'],
+                    asset_id=row['asset_id'] if 'asset_id' in row.keys() else None
+                ))
+            return transactions
 
     def get_balance(self, month=None):
-        conn = self._get_conn()
-        cursor = conn.cursor()
-        
-        income_query = "SELECT SUM(amount) FROM transactions WHERE type='income'"
-        expense_query = "SELECT SUM(amount) FROM transactions WHERE type='expense'"
-        params = []
-        
-        if month:
-            income_query += " AND date LIKE ? || '%'"
-            expense_query += " AND date LIKE ? || '%'"
-            params.append(month)
+        with self._conn() as conn:
+            cursor = conn.cursor()
+            income_query = "SELECT SUM(amount) FROM transactions WHERE type='income'"
+            expense_query = "SELECT SUM(amount) FROM transactions WHERE type='expense'"
+            params = []
             
-        cursor.execute(income_query, params)
-        res = cursor.fetchone()
-        income = res[0] if res and res[0] is not None else 0.0
-        
-        cursor.execute(expense_query, params)
-        res = cursor.fetchone()
-        expense = res[0] if res and res[0] is not None else 0.0
-        
-        conn.close()
-        return income - expense
+            if month:
+                income_query += " AND date LIKE ? || '%'"
+                expense_query += " AND date LIKE ? || '%'"
+                params.append(month)
+                
+            cursor.execute(income_query, params)
+            res = cursor.fetchone()
+            income = res[0] if res and res[0] is not None else 0.0
+            
+            cursor.execute(expense_query, params)
+            res = cursor.fetchone()
+            expense = res[0] if res and res[0] is not None else 0.0
+            
+            return income - expense
 
     def get_transaction(self, transaction_id):
-        conn = self._get_conn()
-        cursor = conn.cursor()
-        cursor.execute('SELECT * FROM transactions WHERE id = ?', (transaction_id,))
-        row = cursor.fetchone()
-        conn.close()
-        if row:
-            return Transaction(
-                id=row['id'],
-                amount=row['amount'],
-                category=row['category'],
-                type=row['type'],
-                description=row['description'],
-                date=row['date'],
-                asset_id=row['asset_id']
-            )
-        return None
+        with self._conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM transactions WHERE id = ?', (transaction_id,))
+            row = cursor.fetchone()
+            if row:
+                return Transaction(
+                    id=row['id'],
+                    amount=row['amount'],
+                    category=row['category'],
+                    type=row['type'],
+                    description=row['description'],
+                    date=row['date'],
+                    asset_id=row['asset_id']
+                )
+            return None
 
     def delete_transaction(self, transaction_id):
-        conn = self._get_conn()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM transactions WHERE id = ?", (transaction_id,))
-        conn.commit()
-        conn.close()
-        return True
+        with self._conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM transactions WHERE id = ?", (transaction_id,))
+            conn.commit()
+            return True
 
     def update_transaction(self, transaction_id, amount, category, type, description, date):
-        conn = self._get_conn()
-        cursor = conn.cursor()
-        cursor.execute('''
-            UPDATE transactions
-            SET amount = ?, category = ?, type = ?, description = ?, date = ?
-            WHERE id = ?
-        ''', (amount, category, type, description, date, transaction_id))
-        conn.commit()
-        conn.close()
-        return True
+        with self._conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE transactions
+                SET amount = ?, category = ?, type = ?, description = ?, date = ?
+                WHERE id = ?
+            ''', (amount, category, type, description, date, transaction_id))
+            conn.commit()
+            return True
 
     # Budget methods
     def add_budget(self, budget: Budget):
-        conn = self._get_conn()
-        cursor = conn.cursor()
-        try:
-            cursor.execute('''
-                INSERT INTO budgets (category, monthly_limit, month)
-                VALUES (?, ?, ?)
-            ''', (budget.category, budget.monthly_limit, budget.month))
-            budget.id = cursor.lastrowid
-            conn.commit()
-        except sqlite3.IntegrityError:
-            # Budget already exists for this category/month, update it
-            cursor.execute('''
-                UPDATE budgets
-                SET monthly_limit = ?
-                WHERE category = ? AND month = ?
-            ''', (budget.monthly_limit, budget.category, budget.month))
-            conn.commit()
-        conn.close()
-        return budget
+        with self._conn() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute('''
+                    INSERT INTO budgets (category, monthly_limit, month)
+                    VALUES (?, ?, ?)
+                ''', (budget.category, budget.monthly_limit, budget.month))
+                budget.id = cursor.lastrowid
+                conn.commit()
+            except sqlite3.IntegrityError:
+                # Budget already exists for this category/month, update it
+                cursor.execute('''
+                    UPDATE budgets
+                    SET monthly_limit = ?
+                    WHERE category = ? AND month = ?
+                ''', (budget.monthly_limit, budget.category, budget.month))
+                conn.commit()
+            return budget
 
     def get_budgets(self, month=None):
-        conn = self._get_conn()
-        cursor = conn.cursor()
-        if month:
-            cursor.execute('SELECT * FROM budgets WHERE month = ?', (month,))
-        else:
-            cursor.execute('SELECT * FROM budgets')
-        rows = cursor.fetchall()
-        conn.close()
-        budgets = []
-        for row in rows:
-            budgets.append(Budget(
-                id=row['id'],
-                category=row['category'],
-                monthly_limit=row['monthly_limit'],
-                month=row['month']
-            ))
-        return budgets
+        with self._conn() as conn:
+            cursor = conn.cursor()
+            if month:
+                cursor.execute('SELECT * FROM budgets WHERE month = ?', (month,))
+            else:
+                cursor.execute('SELECT * FROM budgets')
+            rows = cursor.fetchall()
+            budgets = []
+            for row in rows:
+                budgets.append(Budget(
+                    id=row['id'],
+                    category=row['category'],
+                    monthly_limit=row['monthly_limit'],
+                    month=row['month']
+                ))
+            return budgets
 
     def delete_budget(self, category, month):
-        conn = self._get_conn()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM budgets WHERE category = ? AND month = ?", (category, month))
-        conn.commit()
-        conn.close()
-        return True
+        with self._conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM budgets WHERE category = ? AND month = ?", (category, month))
+            conn.commit()
+            return True
 
     # Reporting methods
     def get_spending_by_category(self, month):
         """Get total spending per category for a specific month (YYYY-MM)"""
-        conn = self._get_conn()
-        cursor = conn.cursor()
-        cursor.execute('''
-            SELECT category, SUM(amount) as total
-            FROM transactions
-            WHERE type = 'expense' AND date LIKE ? || '%'
-            GROUP BY category
-        ''', (month,))
-        rows = cursor.fetchall()
-        conn.close()
-        return {row['category']: row['total'] for row in rows}
+        with self._conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT category, SUM(amount) as total
+                FROM transactions
+                WHERE type = 'expense' AND date LIKE ? || '%'
+                GROUP BY category
+            ''', (month,))
+            rows = cursor.fetchall()
+            return {row['category']: row['total'] for row in rows}
 
     def get_monthly_summary(self, month):
         """Get income, expense, and transaction count for a specific month"""
-        conn = self._get_conn()
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            SELECT SUM(amount) as total
-            FROM transactions
-            WHERE type = 'income' AND date LIKE ? || '%'
-        ''', (month,))
-        income = cursor.fetchone()['total'] or 0.0
-        
-        cursor.execute('''
-            SELECT SUM(amount) as total
-            FROM transactions
-            WHERE type = 'expense' AND date LIKE ? || '%'
-        ''', (month,))
-        expense = cursor.fetchone()['total'] or 0.0
-        
-        cursor.execute('''
-            SELECT COUNT(*) as count
-            FROM transactions
-            WHERE date LIKE ? || '%'
-        ''', (month,))
-        count = cursor.fetchone()['count']
-        
-        conn.close()
-        return {
-            'income': income,
-            'expense': expense,
-            'net': income - expense,
-            'count': count
-        }
+        with self._conn() as conn:
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                SELECT SUM(amount) as total
+                FROM transactions
+                WHERE type = 'income' AND date LIKE ? || '%'
+            ''', (month,))
+            income = cursor.fetchone()['total'] or 0.0
+            
+            cursor.execute('''
+                SELECT SUM(amount) as total
+                FROM transactions
+                WHERE type = 'expense' AND date LIKE ? || '%'
+            ''', (month,))
+            expense = cursor.fetchone()['total'] or 0.0
+            
+            cursor.execute('''
+                SELECT COUNT(*) as count
+                FROM transactions
+                WHERE date LIKE ? || '%'
+            ''', (month,))
+            count = cursor.fetchone()['count']
+            
+            return {
+                'income': income,
+                'expense': expense,
+                'net': income - expense,
+                'count': count
+            }
 
     def get_transactions_by_month(self, month):
         """Get all transactions for a specific month"""
-        conn = self._get_conn()
-        cursor = conn.cursor()
-        cursor.execute('''
-            SELECT * FROM transactions
-            WHERE date LIKE ? || '%'
-            ORDER BY date DESC
-        ''', (month,))
-        rows = cursor.fetchall()
-        conn.close()
-        transactions = []
-        for row in rows:
-            transactions.append(Transaction(
-                id=row['id'],
-                amount=row['amount'],
-                category=row['category'],
-                type=row['type'],
-                description=row['description'],
-                date=row['date'],
-                asset_id=row['asset_id'] if 'asset_id' in row.keys() else None
-            ))
-        return transactions
+        with self._conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT * FROM transactions
+                WHERE date LIKE ? || '%'
+                ORDER BY date DESC
+            ''', (month,))
+            rows = cursor.fetchall()
+            transactions = []
+            for row in rows:
+                transactions.append(Transaction(
+                    id=row['id'],
+                    amount=row['amount'],
+                    category=row['category'],
+                    type=row['type'],
+                    description=row['description'],
+                    date=row['date'],
+                    asset_id=row['asset_id'] if 'asset_id' in row.keys() else None
+                ))
+            return transactions
 
     # Diary methods
-    def save_diary(self, date, content):
-        conn = self._get_conn()
-        cursor = conn.cursor()
-        
-        # If content is empty, delete the entry instead of saving/updating
-        if not content or not content.strip():
-            cursor.execute('DELETE FROM diary WHERE date = ?', (date,))
-        else:
-            try:
-                cursor.execute('''
-                    INSERT INTO diary (date, content)
-                    VALUES (?, ?)
-                ''', (date, content))
-            except sqlite3.IntegrityError:
-                cursor.execute('''
-                    UPDATE diary
-                    SET content = ?
-                    WHERE date = ?
-                ''', (content, date))
-        
-        conn.commit()
-        conn.close()
-        return True
+    def save_diary(self, date, content, title=None):
+        with self._conn() as conn:
+            cursor = conn.cursor()
+            
+            # If content is empty, delete the entry instead of saving/updating
+            if not content or not content.strip():
+                cursor.execute('DELETE FROM diary WHERE date = ?', (date,))
+            else:
+                try:
+                    cursor.execute('''
+                        INSERT INTO diary (date, content, title)
+                        VALUES (?, ?, ?)
+                    ''', (date, content, title))
+                except sqlite3.IntegrityError:
+                    cursor.execute('''
+                        UPDATE diary
+                        SET content = ?, title = ?
+                        WHERE date = ?
+                    ''', (content, title, date))
+            
+            conn.commit()
+            return True
 
     def get_diary(self, date):
-        conn = self._get_conn()
-        cursor = conn.cursor()
-        cursor.execute('SELECT content FROM diary WHERE date = ?', (date,))
-        row = cursor.fetchone()
-        conn.close()
-        return row['content'] if row else ""
+        with self._conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT content, title FROM diary WHERE date = ?', (date,))
+            row = cursor.fetchone()
+            if row:
+                return {"content": row['content'], "title": row['title']}
+            return {"content": "", "title": ""}
 
     def get_diary_history(self):
-        conn = self._get_conn()
-        cursor = conn.cursor()
-        cursor.execute('SELECT date FROM diary ORDER BY date DESC')
-        rows = cursor.fetchall()
-        conn.close()
-        return [row['date'] for row in rows]
+        with self._conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT date, title FROM diary ORDER BY date DESC')
+            rows = cursor.fetchall()
+            return [{"date": row['date'], "title": row['title']} for row in rows]
 
     def get_assets(self):
-        conn = self._get_conn()
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM assets")
-        rows = cursor.fetchall()
-        conn.close()
-        assets = []
-        for row in rows:
-            assets.append({
-                "id": row["id"],
-                "name": row["name"],
-                "type": row["type"],
-                "amount": row["amount"],
-                "interest_rate": row["interest_rate"],
-                "term_months": row["term_months"],
-                "start_date": row["start_date"],
-                "end_date": row["end_date"],
-                "auto_contribution": row["auto_contribution"] if "auto_contribution" in row.keys() else 0,
-                "last_updated_month": row["last_updated_month"] if "last_updated_month" in row.keys() else None
-            })
-        return assets
+        with self._conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM assets")
+            rows = cursor.fetchall()
+            assets = []
+            for row in rows:
+                assets.append({
+                    "id": row["id"],
+                    "name": row["name"],
+                    "type": row["type"],
+                    "amount": row["amount"],
+                    "interest_rate": row["interest_rate"],
+                    "term_months": row["term_months"],
+                    "start_date": row["start_date"],
+                    "end_date": row["end_date"],
+                    "auto_contribution": row["auto_contribution"] if "auto_contribution" in row.keys() else 0,
+                    "last_updated_month": row["last_updated_month"] if "last_updated_month" in row.keys() else None
+                })
+            return assets
+    
+    def get_asset_balance_adjustment_after(self, asset_id, month):
+        """
+        Calculate total changes to an asset after the specified month (YYYY-MM).
+        Returns SUM(income_amount) - SUM(expense_amount) for transactions > last day of month.
+        """
+        with self._conn() as conn:
+            cursor = conn.cursor()
+            
+            # We want transactions happening AFTER this month.
+            # SQLite comparison: '2026-02' > '2026-01' works.
+            # But '2026-01-15' starts with '2026-01'.
+            # We want anything where date >= 'YYYY-(MM+1)-01'
+            # Easier: date NOT LIKE 'YYYY-MM%' AND date > 'YYYY-MM'
+            
+            cursor.execute('''
+                SELECT type, SUM(amount) as total
+                FROM transactions
+                WHERE asset_id = ? AND substr(date, 1, 7) > ?
+                GROUP BY type
+            ''', (asset_id, month))
+            
+            rows = cursor.fetchall()
+            
+            adjustment = 0.0
+            for row in rows:
+                if row['type'] == 'income':
+                    adjustment += row['total']
+                else: # expense
+                    adjustment -= row['total']
+            return adjustment
     
     def update_asset_balance(self, asset_id, new_amount, last_updated_month=None):
-        conn = self._get_conn()
-        cursor = conn.cursor()
-        if last_updated_month:
-            cursor.execute("UPDATE assets SET amount = ?, last_updated_month = ? WHERE id = ?", (new_amount, last_updated_month, asset_id))
-        else:
-            cursor.execute("UPDATE assets SET amount = ? WHERE id = ?", (new_amount, asset_id))
-        conn.commit()
-        conn.close()
+        with self._conn() as conn:
+            cursor = conn.cursor()
+            if last_updated_month:
+                cursor.execute("UPDATE assets SET amount = ?, last_updated_month = ? WHERE id = ?", (new_amount, last_updated_month, asset_id))
+            else:
+                cursor.execute("UPDATE assets SET amount = ? WHERE id = ?", (new_amount, asset_id))
+            conn.commit()
 
     def get_available_months(self):
         """Returns a list of unique months (YYYY-MM) that have transactions"""
-        conn = self._get_conn()
-        cursor = conn.cursor()
-        # Extract YYYY-MM from date strings like 'YYYY-MM-DD HH:MM:SS'
-        cursor.execute("SELECT DISTINCT substr(date, 1, 7) as month FROM transactions ORDER BY month DESC")
-        months = [row['month'] for row in cursor.fetchall() if row['month']]
-        conn.close()
-        return months
+        with self._conn() as conn:
+            cursor = conn.cursor()
+            # Extract YYYY-MM from date strings like 'YYYY-MM-DD HH:MM:SS'
+            cursor.execute("SELECT DISTINCT substr(date, 1, 7) as month FROM transactions ORDER BY month DESC")
+            months = [row['month'] for row in cursor.fetchall() if row['month']]
+            return months
 
 
 

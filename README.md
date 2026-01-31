@@ -4,9 +4,11 @@ A full-stack financial management application featuring an AI assistant that und
 
 ## Features
 - **Magic AI Assistant**: Supports Vietnamese currency terms like "3 triệu", "500k", "2 tỷ" and relative budget updates ("tăng thêm 500k").
+- **Assets & Savings Tracking**: Monitor liquid assets and long-term savings with time-based progress tracking.
+- **Daily Journal**: Record daily thoughts and financial notes with custom titles and search functionality.
 - **Budget Manager**: Set and track monthly spending limits by category.
-- **Visual Analytics**: Interactive charts showing your spending breakdown.
-- **Responsive Design**: Modern, glassmorphic UI with dynamic backgrounds.
+- **Visual Analytics**: Interactive charts and detailed monthly reports.
+- **Responsive Design**: Modern, glassmorphic UI with dynamic backgrounds and micro-animations.
 
 ## Setup Instructions
 

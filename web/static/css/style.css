@@ -25,6 +25,26 @@ body {
     color: var(--text-primary);
     line-height: 1.5;
     min-height: 100vh;
+    scroll-behavior: smooth;
+}
+
+/* Global Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 5px;
+    border: 2px solid #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
 }
 
 .app-layout {
@@ -47,6 +67,8 @@ body {
     border-radius: 1.25rem;
     padding: 1.5rem;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+    opacity: 0;
+    animation: slideUp 0.5s ease-out forwards;
 }
 
 .sidebar-header h3 {
@@ -179,6 +201,20 @@ section {
     /* Soft glass shadow */
     border: 1px solid rgba(255, 255, 255, 0.4);
     /* Subtle border for definition */
+    opacity: 0;
+    animation: slideUp 0.5s ease-out forwards;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 h3 {
