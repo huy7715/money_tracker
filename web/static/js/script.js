@@ -1,19 +1,72 @@
+// --- Constants & Shared RegExps (js-hoist-regexp) ---
+const WHITESPACE_REGEX = /\s+/g;
+const DOT_REGEX = /\./g;
+const COMMA_REGEX = /,/g;
+
 document.addEventListener('DOMContentLoaded', () => {
-    const form = document.getElementById('transaction-form');
-    const balanceAmount = document.getElementById('balance-amount');
-    const monthSelector = document.getElementById('month-selector');
-    const transactionList = document.getElementById('transaction-list');
+    // --- Cached DOM Elements (js-cache-property-access inspired) ---
+    const EL = {
+        form: document.getElementById('transaction-form'),
+        balanceAmount: document.getElementById('balance-amount'),
+        monthSelector: document.getElementById('month-selector'),
+        transactionList: document.getElementById('transaction-list'),
+        aiBtn: document.getElementById('ai-btn'),
+        aiInput: document.getElementById('ai-input'),
+        aiLoading: document.getElementById('ai-loading'),
+        amount: document.getElementById('amount'),
+        category: document.getElementById('category'),
+        type: document.getElementById('type'),
+        description: document.getElementById('description'),
+        assetSelect: document.getElementById('transaction-asset'),
+        budgetCategory: document.getElementById('budget-category'),
+        budgetLimit: document.getElementById('budget-limit'),
+        budgetList: document.getElementById('budget-list'),
+        setBudgetBtn: document.getElementById('set-budget-btn'),
+        diaryDate: document.getElementById('diary-date'),
+        diaryContent: document.getElementById('diary-content'),
+        diaryTitle: document.getElementById('diary-title'),
+        saveDiaryBtn: document.getElementById('save-diary-btn'),
+        diaryHistoryList: document.getElementById('diary-history-list'),
+        noteSearch: document.getElementById('note-search'),
+        aiModelBadge: document.getElementById('ai-model-badge'),
+        modelSelector: document.getElementById('model-selector'),
+        bgBtn: document.getElementById('bg-btn'),
+        resetBgBtn: document.getElementById('reset-bg-btn'),
+        bgInput: document.getElementById('bg-input'),
+        assetsLoading: document.getElementById('assets-loading'),
+        assetsContent: document.getElementById('assets-content'),
+        assetCash: document.getElementById('asset-cash'),
+        assetBank: document.getElementById('asset-bank'),
+        savingsList: document.getElementById('savings-list'),
+        editModal: document.getElementById('edit-modal'),
+        editForm: document.getElementById('edit-form'),
+        editId: document.getElementById('edit-id'),
+        editAmount: document.getElementById('edit-amount'),
+        editCategory: document.getElementById('edit-category'),
+        editType: document.getElementById('edit-type'),
+        editDescription: document.getElementById('edit-description'),
+        editDate: document.getElementById('edit-date'),
+        monthSpentStat: document.getElementById('month-spent-stat'),
+        txCountStat: document.getElementById('tx-count-stat'),
+        totalIncomeStat: document.getElementById('total-income-stat'),
+        totalExpenseStat: document.getElementById('total-expense-stat'),
+        bulkModal: document.getElementById('bulk-modal'),
+        bulkInputStep: document.getElementById('bulk-input-step'),
+        bulkReviewStep: document.getElementById('bulk-review-step'),
+        bulkLoading: document.getElementById('bulk-loading'),
+        bulkTableBody: document.getElementById('bulk-review-table-body'),
+        bulkCountBadge: document.getElementById('bulk-count-badge'),
+        bulkTextInput: document.getElementById('bulk-text-input'),
+        bulkExtractBtn: document.getElementById('bulk-extract-btn'),
+        bulkConfirmBtn: document.getElementById('bulk-confirm-btn')
+    };
 
     // Utility: Debounce function
     function debounce(func, wait) {
         let timeout;
-        return function executedFunction(...args) {
-            const later = () => {
-                clearTimeout(timeout);
-                func(...args);
-            };
+        return (...args) => {
             clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
+            timeout = setTimeout(() => func(...args), wait);
         };
     }
 
@@ -23,7 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Helper: Parse string with dots/commas to number
     function parseVND(str) {
         if (!str) return 0;
-        let s = str.toString().toLowerCase().trim().replace(/\s+/g, '');
+        let s = str.toString().toLowerCase().trim().replace(WHITESPACE_REGEX, '');
         let multiplier = 1;
 
         if (s.endsWith('tỷ')) {
@@ -42,7 +95,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Replace dots (thousands separators in VN) with nothing
         // Replace comma (decimal separator in VN) with dot
-        let clean = s.replace(/\./g, '').replace(/,/g, '.');
+        let clean = s.replace(DOT_REGEX, '').replace(COMMA_REGEX, '.');
         let val = parseFloat(clean);
         return isNaN(val) ? 0 : val * multiplier;
     }
@@ -56,7 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Helper: Clean and process amount for storage
     function getFullAmount(input) {
-        const raw = input.value.toLowerCase().trim().replace(/\s+/g, '');
+        const raw = input.value.toLowerCase().trim().replace(WHITESPACE_REGEX, '');
         if (!raw) return 0;
 
         const hasSuffix = raw.endsWith('k') || raw.endsWith('m') || raw.endsWith('tr') ||
@@ -80,8 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Smart Input Logic: Format on Blur, Revert on Focus
-    function setupSmartInput(inputId) {
-        const input = document.getElementById(inputId);
+    function setupSmartInput(input) {
         if (!input) return;
 
         input.addEventListener('focus', function () {
@@ -102,36 +154,33 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    setupSmartInput('amount');
-    setupSmartInput('edit-amount');
-    setupSmartInput('budget-limit');
+    setupSmartInput(EL.amount);
+    setupSmartInput(EL.editAmount);
+    setupSmartInput(EL.budgetLimit);
 
     // Fetch AI Model Info
     async function fetchAIInfo() {
-        const badge = document.getElementById('ai-model-badge');
-        const selector = document.getElementById('model-selector');
-        if (!badge) return;
+        if (!EL.aiModelBadge) return;
         try {
             const response = await fetch('/api/ai-info');
             const data = await response.json();
             if (data.provider && data.model) {
-                badge.textContent = `${data.provider} (${data.model})`;
-                if (selector) selector.value = data.provider.toLowerCase();
+                EL.aiModelBadge.textContent = `${data.provider} (${data.model})`;
+                if (EL.modelSelector) EL.modelSelector.value = data.provider.toLowerCase();
             } else {
-                badge.textContent = 'AI Ready';
+                EL.aiModelBadge.textContent = 'AI Ready';
             }
         } catch (error) {
             console.error('Error fetching AI info:', error);
-            badge.textContent = 'AI Offline';
+            EL.aiModelBadge.textContent = 'AI Offline';
         }
     }
     fetchAIInfo();
 
     // Model Selector Change Logic
-    document.getElementById('model-selector')?.addEventListener('change', async (e) => {
+    EL.modelSelector?.addEventListener('change', async (e) => {
         const provider = e.target.value;
-        const badge = document.getElementById('ai-model-badge');
-        badge.textContent = 'Switching...';
+        if (EL.aiModelBadge) EL.aiModelBadge.textContent = 'Switching...';
 
         try {
             const response = await fetch('/api/switch-model', {
@@ -158,12 +207,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const aiInput = document.getElementById('ai-input');
     const aiLoading = document.getElementById('ai-loading');
 
-    aiBtn.addEventListener('click', async () => {
-        const text = aiInput.value.trim();
+    EL.aiBtn.addEventListener('click', async () => {
+        const text = EL.aiInput.value.trim();
         if (!text) return;
 
-        aiBtn.style.display = 'none';
-        aiLoading.style.display = 'flex';
+        EL.aiBtn.style.display = 'none';
+        EL.aiLoading.style.display = 'flex';
 
         try {
             const response = await fetch('/api/magic-assistant', {
@@ -177,34 +226,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert('AI Error: ' + result.error);
             } else if (result.intent === 'budget') {
                 // Populate Budget Form
-                if (result.category && budgetCategory) {
-                    let match = Array.from(budgetCategory.options).find(opt => opt.value && opt.value.toLowerCase() === result.category.toLowerCase());
+                if (result.category && EL.budgetCategory) {
+                    let match = Array.from(EL.budgetCategory.options).find(opt => opt.value && opt.value.toLowerCase() === result.category.toLowerCase());
                     if (match) {
-                        budgetCategory.value = match.value;
+                        EL.budgetCategory.value = match.value;
                     } else {
                         // Attempt partial match or default to Other
-                        match = Array.from(budgetCategory.options).find(opt => opt.value && result.category.toLowerCase().includes(opt.value.toLowerCase()));
-                        budgetCategory.value = match ? match.value : 'Other';
+                        match = Array.from(EL.budgetCategory.options).find(opt => opt.value && result.category.toLowerCase().includes(opt.value.toLowerCase()));
+                        EL.budgetCategory.value = match ? match.value : 'Other';
                     }
                 }
 
                 if (result.monthly_limit) {
-                    budgetLimit.value = formatVND(result.monthly_limit);
-                    budgetLimit.dataset.adjustment = result.adjustment || '';
+                    EL.budgetLimit.value = formatVND(result.monthly_limit);
+                    EL.budgetLimit.dataset.adjustment = result.adjustment || '';
                     if (result.adjustment) {
                         const adjText = result.adjustment === 'increase' ? ' (Tăng thêm)' : ' (Giảm bớt)';
                         // Show visual feedback for adjustment
-                        const label = budgetLimit.parentElement.querySelector('label');
+                        const label = EL.budgetLimit.parentElement.querySelector('label');
                         if (label) label.textContent = 'Monthly Limit' + adjText;
                     } else {
-                        const label = budgetLimit.parentElement.querySelector('label');
+                        const label = EL.budgetLimit.parentElement.querySelector('label');
                         if (label) label.textContent = 'Monthly Limit';
                     }
-                    budgetLimit.style.backgroundColor = '#dcfce7'; // Light green flash
-                    setTimeout(() => budgetLimit.style.backgroundColor = '', 500);
+                    EL.budgetLimit.style.backgroundColor = '#dcfce7'; // Light green flash
+                    setTimeout(() => EL.budgetLimit.style.backgroundColor = '', 500);
                 }
 
-                aiInput.value = '';
+                EL.aiInput.value = '';
 
                 // Scroll to budget manager safely
                 const budgetSection = document.querySelector('.budget-manager');
@@ -213,7 +262,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 // Visual feedback safely
-                if (budgetLimit) budgetLimit.focus();
+                if (EL.budgetLimit) EL.budgetLimit.focus();
 
             } else {
                 // Populate Transaction Form
@@ -245,29 +294,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 if (result.description) {
-                    const descInput = document.getElementById('description');
-                    if (descInput) descInput.value = result.description;
+                    if (EL.description) EL.description.value = result.description;
                 }
 
                 // Auto-select Payment Source based on AI
-                const assetSelect = document.getElementById('transaction-asset');
-                if (result.payment_source && assetSelect) {
-                    for (let i = 0; i < assetSelect.options.length; i++) {
-                        const opt = assetSelect.options[i];
+                if (result.payment_source && EL.assetSelect) {
+                    for (let i = 0; i < EL.assetSelect.options.length; i++) {
+                        const opt = EL.assetSelect.options[i];
                         if (opt.text.toLowerCase().includes(result.payment_source.toLowerCase())) {
-                            assetSelect.selectedIndex = i;
+                            EL.assetSelect.selectedIndex = i;
                             break;
                         }
                     }
                 }
 
                 // Clear AI input
-                aiInput.value = '';
+                EL.aiInput.value = '';
 
                 // Scroll to form safely
-                const transForm = document.getElementById('transaction-form');
-                if (transForm) {
-                    transForm.scrollIntoView({ behavior: 'smooth' });
+                if (EL.form) {
+                    EL.form.scrollIntoView({ behavior: 'smooth' });
                 }
             }
         } catch (error) {
@@ -280,28 +326,27 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Allow Enter key in AI input
-    aiInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') aiBtn.click();
+    EL.aiInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') EL.aiBtn.click();
     });
 
     // Add Transaction
-    form.addEventListener('submit', async (e) => {
+    EL.form.addEventListener('submit', async (e) => {
         e.preventDefault();
 
-        const amountInput = document.getElementById('amount');
-        const category = document.getElementById('category').value;
-        const type = document.getElementById('type').value;
-        const description = document.getElementById('description').value;
-        const assetId = document.getElementById('transaction-asset').value; // New
+        const category = EL.category.value;
+        const type = EL.type.value;
+        const description = EL.description.value;
+        const assetId = EL.assetSelect.value; // New
 
-        let amountIndex = getFullAmount(amountInput);
+        let amountIndex = getFullAmount(EL.amount);
 
         const data = {
             amount: amountIndex,
             category: category,
             type: type,
             description: description,
-            date: document.getElementById('date').value,
+            date: EL.form.querySelector('#date').value,
             asset_id: assetId // New
         };
 
@@ -313,7 +358,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (response.ok) {
-                form.reset();
+                EL.form.reset();
                 fetchData();
             } else {
                 alert('Failed to add transaction');
@@ -330,46 +375,44 @@ document.addEventListener('DOMContentLoaded', () => {
     const diaryHistoryList = document.getElementById('diary-history-list');
 
     // Set today's date as default
-    if (diaryDateInput) {
+    if (EL.diaryDate) {
         const today = new Date().toISOString().split('T')[0];
-        diaryDateInput.value = today;
+        EL.diaryDate.value = today;
         loadDiary(today);
         loadDiaryHistory();
 
-        diaryDateInput.addEventListener('change', (e) => {
+        EL.diaryDate.addEventListener('change', (e) => {
             loadDiary(e.target.value);
         });
     }
 
     async function loadDiary(date) {
-        if (!diaryContent) return;
-        const diaryTitle = document.getElementById('diary-title');
-        diaryContent.placeholder = "Loading your thoughts...";
-        if (diaryTitle) diaryTitle.value = "";
+        if (!EL.diaryContent) return;
+        EL.diaryContent.placeholder = "Loading your thoughts...";
+        if (EL.diaryTitle) EL.diaryTitle.value = "";
 
         try {
             const response = await fetch(`/api/diary?date=${date}`);
             const data = await response.json();
-            diaryContent.value = data.content || "";
-            if (diaryTitle) diaryTitle.value = data.title || "";
-            diaryContent.placeholder = "Share your thoughts for today...";
+            EL.diaryContent.value = data.content || "";
+            if (EL.diaryTitle) EL.diaryTitle.value = data.title || "";
+            EL.diaryContent.placeholder = "Share your thoughts for today...";
         } catch (error) {
             console.error('Error loading diary:', error);
-            diaryContent.placeholder = "Failed to load thoughts.";
+            EL.diaryContent.placeholder = "Failed to load thoughts.";
         }
     }
 
     async function loadDiaryHistory() {
-        if (!diaryHistoryList) return;
+        if (!EL.diaryHistoryList) return;
 
-        const searchInput = document.getElementById('note-search');
-        if (searchInput && !searchInput.dataset.listenerAdded) {
+        if (EL.noteSearch && !EL.noteSearch.dataset.listenerAdded) {
             const debouncedLoad = debounce(() => loadDiaryHistory(), 250);
-            searchInput.addEventListener('input', debouncedLoad);
-            searchInput.dataset.listenerAdded = 'true';
+            EL.noteSearch.addEventListener('input', debouncedLoad);
+            EL.noteSearch.dataset.listenerAdded = 'true';
         }
 
-        const searchTerm = searchInput ? searchInput.value.toLowerCase() : "";
+        const searchTerm = EL.noteSearch ? EL.noteSearch.value.toLowerCase() : "";
 
         try {
             const response = await fetch('/api/diary/history');
@@ -385,11 +428,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
 
                 if (filteredHistory.length === 0) {
-                    diaryHistoryList.innerHTML = '<p style="font-size: 0.75rem; color: #9ca3af; text-align: center;">No matching notes</p>';
+                    EL.diaryHistoryList.innerHTML = '<p style="font-size: 0.75rem; color: #9ca3af; text-align: center;">No matching notes</p>';
                     return;
                 }
 
-                diaryHistoryList.innerHTML = '';
+                EL.diaryHistoryList.innerHTML = '';
 
                 // Group by Month/Year
                 const groups = {};
@@ -413,7 +456,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const header = document.createElement('div');
                     header.className = 'note-group-header';
                     header.textContent = groupLabel;
-                    diaryHistoryList.appendChild(header);
+                    EL.diaryHistoryList.appendChild(header);
 
                     // Add items in this group
                     groups[groupKey].forEach(item => {
@@ -431,29 +474,28 @@ document.addEventListener('DOMContentLoaded', () => {
                             <span class="day-chip">Day ${day}</span>
                         `;
                         btn.onclick = () => {
-                            diaryDateInput.value = date;
+                            EL.diaryDate.value = date;
                             loadDiary(date);
                         };
-                        diaryHistoryList.appendChild(btn);
+                        EL.diaryHistoryList.appendChild(btn);
                     });
                 });
             } else {
-                diaryHistoryList.innerHTML = '<p style="font-size: 0.75rem; color: #9ca3af; text-align: center;">No notes recorded yet</p>';
+                EL.diaryHistoryList.innerHTML = '<p style="font-size: 0.75rem; color: #9ca3af; text-align: center;">No notes recorded yet</p>';
             }
         } catch (error) {
             console.error('Error loading history:', error);
         }
     }
 
-    saveDiaryBtn?.addEventListener('click', async () => {
-        const date = diaryDateInput.value;
-        const content = diaryContent.value;
-        const diaryTitle = document.getElementById('diary-title');
-        const title = diaryTitle ? diaryTitle.value : "";
+    EL.saveDiaryBtn?.addEventListener('click', async () => {
+        const date = EL.diaryDate.value;
+        const content = EL.diaryContent.value;
+        const title = EL.diaryTitle ? EL.diaryTitle.value : "";
         if (!date) return;
 
-        saveDiaryBtn.textContent = "Saving...";
-        saveDiaryBtn.disabled = true;
+        EL.saveDiaryBtn.textContent = "Saving...";
+        EL.saveDiaryBtn.disabled = true;
 
         try {
             const response = await fetch('/api/diary', {
@@ -462,30 +504,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({ date, content, title })
             });
             if (response.ok) {
-                saveDiaryBtn.textContent = "Saved! ✓";
+                EL.saveDiaryBtn.textContent = "Saved! ✓";
                 loadDiaryHistory(); // Refresh history list
                 setTimeout(() => {
-                    saveDiaryBtn.textContent = "Save Note";
-                    saveDiaryBtn.disabled = false;
+                    EL.saveDiaryBtn.textContent = "Save Note";
+                    EL.saveDiaryBtn.disabled = false;
                 }, 2000);
             } else {
                 alert('Failed to save note');
-                saveDiaryBtn.textContent = "Save Note";
-                saveDiaryBtn.disabled = false;
+                EL.saveDiaryBtn.textContent = "Save Note";
+                EL.saveDiaryBtn.disabled = false;
             }
         } catch (error) {
             console.error('Error saving diary:', error);
             alert('An error occurred while saving');
-            saveDiaryBtn.textContent = "Save Note";
-            saveDiaryBtn.disabled = false;
+            EL.saveDiaryBtn.textContent = "Save Note";
+            EL.saveDiaryBtn.disabled = false;
         }
-    });
+    }, { passive: true });
 
     // ========== SIDEBAR STATS ==========
     async function updateSidebarStats(transactions, monthOverride = null) {
-        const spentStat = document.getElementById('month-spent-stat');
-        const countStat = document.getElementById('tx-count-stat');
-        if (!spentStat || !countStat) return;
+        if (!EL.monthSpentStat || !EL.txCountStat) return;
 
         const now = new Date();
         const year = now.getFullYear();
@@ -507,8 +547,8 @@ document.addEventListener('DOMContentLoaded', () => {
             .filter(t => t.type === 'expense')
             .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
-        spentStat.textContent = `${totalSpent.toLocaleString('vi-VN')} ₫`;
-        countStat.textContent = monthTxs.length;
+        EL.monthSpentStat.textContent = `${totalSpent.toLocaleString('vi-VN')} ₫`;
+        EL.txCountStat.textContent = monthTxs.length;
     }
 
     // ========== MAIN DATA FETCHING ==========
@@ -529,16 +569,14 @@ document.addEventListener('DOMContentLoaded', () => {
             fetchAssets(effectiveMonth);
 
             // Update balance
-            if (balanceAmount) {
-                balanceAmount.textContent = `${(data.balance || 0).toLocaleString('vi-VN')} ₫`;
+            if (EL.balanceAmount) {
+                EL.balanceAmount.textContent = `${(data.balance || 0).toLocaleString('vi-VN')} ₫`;
             }
 
             // Update All-Time Stats in Sidebar
             if (data.all_time) {
-                const totalIncomeStat = document.getElementById('total-income-stat');
-                const totalExpenseStat = document.getElementById('total-expense-stat');
-                if (totalIncomeStat) totalIncomeStat.textContent = `${Number(data.all_time.income || 0).toLocaleString('vi-VN')} ₫`;
-                if (totalExpenseStat) totalExpenseStat.textContent = `${Number(data.all_time.expense || 0).toLocaleString('vi-VN')} ₫`;
+                if (EL.totalIncomeStat) EL.totalIncomeStat.textContent = `${Number(data.all_time.income || 0).toLocaleString('vi-VN')} ₫`;
+                if (EL.totalExpenseStat) EL.totalExpenseStat.textContent = `${Number(data.all_time.expense || 0).toLocaleString('vi-VN')} ₫`;
             }
 
             // Update Stats in Sidebar (Selected Month)
@@ -557,9 +595,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 updateChart(chartData);
 
-                // Update Transaction List
-                if (transactionList) {
-                    transactionList.innerHTML = '';
+                // Update Transaction List using DocumentFragment (js-batch-dom-updates)
+                if (EL.transactionList) {
+                    const fragment = document.createDocumentFragment();
                     data.transactions.forEach(t => {
                         const li = document.createElement('li');
                         li.className = `transaction-item ${t.type}`;
@@ -578,8 +616,10 @@ document.addEventListener('DOMContentLoaded', () => {
                                 </div>
                             </div>
                         `;
-                        transactionList.appendChild(li);
+                        fragment.appendChild(li);
                     });
+                    EL.transactionList.innerHTML = '';
+                    EL.transactionList.appendChild(fragment);
                 }
             }
 
@@ -597,7 +637,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // fetchData();
 
     // Populate Month Selector and handle change
-    if (monthSelector) {
+    if (EL.monthSelector) {
         async function updateAvailableMonths() {
             try {
                 const response = await fetch('/api/available-months');
@@ -612,7 +652,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 // Clear and repopulate
-                monthSelector.innerHTML = '';
+                EL.monthSelector.innerHTML = '';
                 months.forEach(monthVal => {
                     const [year, month] = monthVal.split('-');
                     const date = new Date(year, month - 1, 1);
@@ -621,20 +661,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     const opt = document.createElement('option');
                     opt.value = monthVal;
                     opt.textContent = monthLabel;
-                    monthSelector.appendChild(opt);
+                    EL.monthSelector.appendChild(opt);
                 });
 
                 // Set default value to saved month OR current month
                 const savedMonth = localStorage.getItem('selectedMonth');
                 if (savedMonth && months.includes(savedMonth)) {
-                    monthSelector.value = savedMonth;
+                    EL.monthSelector.value = savedMonth;
                 } else {
-                    monthSelector.value = currentMonth;
+                    EL.monthSelector.value = currentMonth;
                     localStorage.setItem('selectedMonth', currentMonth);
                 }
 
                 // Initial fetch for the settled month
-                fetchData(monthSelector.value);
+                fetchData(EL.monthSelector.value);
 
             } catch (e) {
                 console.error('Error fetching months:', e);
@@ -645,7 +685,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         updateAvailableMonths();
 
-        monthSelector.addEventListener('change', (e) => {
+        EL.monthSelector.addEventListener('change', (e) => {
             const selectedMonth = e.target.value;
             localStorage.setItem('selectedMonth', selectedMonth);
             fetchData(selectedMonth);
@@ -725,56 +765,51 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // Edit Logic
-    const modal = document.getElementById('edit-modal');
-    const editForm = document.getElementById('edit-form');
-    const editAmountInput = document.getElementById('edit-amount');
 
     window.editTransaction = (id, amount, category, type, description, date) => {
-        document.getElementById('edit-id').value = id;
+        if (EL.editId) EL.editId.value = id;
 
         // Display as Formatted Full Value (e.g. 1.000). 
         // Focus handler will convert to '1'.
-        editAmountInput.value = formatVND(amount);
+        if (EL.editAmount) EL.editAmount.value = formatVND(amount);
 
-        document.getElementById('edit-category').value = category;
-        document.getElementById('edit-type').value = type;
-        document.getElementById('edit-description').value = description;
+        if (EL.editCategory) EL.editCategory.value = category;
+        if (EL.editType) EL.editType.value = type;
+        if (EL.editDescription) EL.editDescription.value = description;
 
         // Preserve date
-        if (date) {
+        if (date && EL.editDate) {
             // datetime-local expects YYYY-MM-DDTHH:MM
             // SQL might store as YYYY-MM-DD HH:MM:SS
             const formattedDate = date.replace(' ', 'T').substring(0, 16);
-            document.getElementById('edit-date').value = formattedDate;
+            EL.editDate.value = formattedDate;
         }
 
-        modal.style.display = 'block';
+        if (EL.editModal) EL.editModal.style.display = 'block';
     };
 
     window.closeModal = () => {
-        modal.style.display = 'none';
+        if (EL.editModal) EL.editModal.style.display = 'none';
     };
 
     window.onclick = (event) => {
-        if (event.target == modal) {
-            modal.style.display = "none";
+        if (event.target == EL.editModal) {
+            EL.editModal.style.display = "none";
         }
     };
 
-    editForm.addEventListener('submit', async (e) => {
+    EL.editForm?.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const id = document.getElementById('edit-id').value;
-        const editAmountInput = document.getElementById('edit-amount');
+        const id = EL.editId.value;
 
-        let amount = getFullAmount(editAmountInput);
+        let amount = getFullAmount(EL.editAmount);
 
         const data = {
             amount: amount,
-            category: document.getElementById('edit-category').value,
-            type: document.getElementById('edit-type').value,
-            description: document.getElementById('edit-description').value,
-            date: document.getElementById('edit-date').value
+            category: EL.editCategory.value,
+            type: EL.editType.value,
+            description: EL.editDescription.value,
+            date: EL.editDate.value
         };
 
         try {
@@ -797,10 +832,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initial fetch
     fetchData();
 
-    // Background Image Logic
-    const bgBtn = document.getElementById('bg-btn');
-    const resetBgBtn = document.getElementById('reset-bg-btn');
-    const bgInput = document.getElementById('bg-input');
 
     // Load saved background
     const savedBg = localStorage.getItem('custom_bg');
@@ -808,18 +839,18 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.style.backgroundImage = `url(${savedBg})`;
     }
 
-    bgBtn.addEventListener('click', () => {
-        bgInput.click();
+    EL.bgBtn?.addEventListener('click', () => {
+        EL.bgInput.click();
     });
 
-    resetBgBtn.addEventListener('click', () => {
+    EL.resetBgBtn?.addEventListener('click', () => {
         if (confirm('Remove custom background?')) {
             localStorage.removeItem('custom_bg');
             document.body.style.backgroundImage = '';
         }
     });
 
-    bgInput.addEventListener('change', (e) => {
+    EL.bgInput?.addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (file) {
             const reader = new FileReader();
@@ -838,26 +869,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-    window.onclick = (event) => {
-        if (event.target == document.getElementById('edit-modal')) {
-            document.getElementById('edit-modal').style.display = "none";
-        }
-    };
 
-    // ========== BUDGET MANAGEMENT ==========
-    const setBudgetBtn = document.getElementById('set-budget-btn');
-    const budgetCategory = document.getElementById('budget-category');
-    const budgetLimit = document.getElementById('budget-limit');
-    const budgetList = document.getElementById('budget-list');
 
     // Set Budget
-    setBudgetBtn?.addEventListener('click', async () => {
-        const category = budgetCategory.value;
-        let limit = parseVND(budgetLimit.value);
+    EL.setBudgetBtn?.addEventListener('click', async () => {
+        const category = EL.budgetCategory.value;
+        let limit = parseVND(EL.budgetLimit.value);
 
         // If currently focused, treat as "thousands" unless it has suffix
-        if (document.activeElement === budgetLimit) {
-            const raw = budgetLimit.value.toLowerCase().trim();
+        if (document.activeElement === EL.budgetLimit) {
+            const raw = EL.budgetLimit.value.toLowerCase().trim();
             if (!raw.endsWith('k') && !raw.endsWith('m')) {
                 limit = limit * 1000;
             }
@@ -869,7 +890,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            const adjustment = budgetLimit.dataset.adjustment || null;
+            const adjustment = EL.budgetLimit.dataset.adjustment || null;
             const response = await fetch('/api/budget', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -881,11 +902,11 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (response.ok) {
-                budgetCategory.value = '';
-                budgetLimit.value = '';
-                delete budgetLimit.dataset.adjustment;
+                EL.budgetCategory.value = '';
+                EL.budgetLimit.value = '';
+                delete EL.budgetLimit.dataset.adjustment;
                 // Reset label text if it was changed
-                const label = budgetLimit.parentElement.querySelector('label');
+                const label = EL.budgetLimit.parentElement.querySelector('label');
                 if (label) label.textContent = 'Monthly Limit';
                 fetchBudgetStatus();
             } else {
@@ -904,14 +925,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(url);
             const budgets = await response.json();
 
-            if (!budgetList) return;
+            if (!EL.budgetList) return;
 
             if (budgets.length === 0) {
-                budgetList.innerHTML = '<p style="text-align: center; opacity: 0.7;">No budgets set yet. Add one above!</p>';
+                EL.budgetList.innerHTML = '<p style="text-align: center; opacity: 0.7;">No budgets set yet. Add one above!</p>';
                 return;
             }
 
-            budgetList.innerHTML = '';
+            const fragment = document.createDocumentFragment();
             budgets.forEach(budget => {
                 const percentage = Math.min(budget.percentage, 100);
 
@@ -992,8 +1013,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         ${budget.category.split(' ')[0]}
                     </div>
                 `;
-                budgetList.appendChild(item);
+                fragment.appendChild(item);
             });
+            EL.budgetList.innerHTML = '';
+            EL.budgetList.appendChild(fragment);
         } catch (error) {
             console.error('Error fetching budget status:', error);
         }
@@ -1001,17 +1024,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Edit Budget
     window.editBudget = (category, limit) => {
-        if (!budgetCategory || !budgetLimit) return;
+        if (!EL.budgetCategory || !EL.budgetLimit) return;
 
-        budgetCategory.value = category;
+        EL.budgetCategory.value = category;
         // Format the limit using VND system so it's readable
-        budgetLimit.value = formatVND(limit);
+        EL.budgetLimit.value = formatVND(limit);
 
         // Scroll to form
         document.querySelector('.budget-form-wrapper')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
         // Brief highlight effect on the input
-        budgetLimit.focus();
+        EL.budgetLimit.focus();
     };
 
     // Delete Budget
@@ -1037,17 +1060,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ========== ASSETS & SAVINGS LOGIC ==========
     async function fetchAssets(month = null) {
-        const loading = document.getElementById('assets-loading');
-        const content = document.getElementById('assets-content');
-        if (!loading || !content) return;
+        if (!EL.assetsLoading || !EL.assetsContent) return;
 
         try {
             const url = month ? `/api/assets?month=${month}` : '/api/assets';
             const response = await fetch(url);
             const assets = await response.json();
 
-            loading.style.display = 'none';
-            content.style.display = 'block';
+            EL.assetsLoading.style.display = 'none';
+            EL.assetsContent.style.display = 'block';
 
             let cash = 0;
             let bank = 0;
@@ -1060,11 +1081,10 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             // Populate Payment Source Dropdown (Liquid only)
-            const assetSelect = document.getElementById('transaction-asset');
-            if (assetSelect) {
+            if (EL.assetSelect) {
                 // Clear existing options except default "None"
-                while (assetSelect.options.length > 1) {
-                    assetSelect.remove(1);
+                while (EL.assetSelect.options.length > 1) {
+                    EL.assetSelect.remove(1);
                 }
 
                 assets.forEach(a => {
@@ -1072,18 +1092,21 @@ document.addEventListener('DOMContentLoaded', () => {
                         const opt = document.createElement('option');
                         opt.value = a.id;
                         opt.textContent = `${a.name} (${formatVND(a.amount)})`;
-                        assetSelect.appendChild(opt);
+                        EL.assetSelect.appendChild(opt);
                     }
                 });
             }
 
             // Update Liquid Cards
-            document.getElementById('asset-cash').textContent = formatVND(cash) + ' ₫';
-            document.getElementById('asset-bank').textContent = formatVND(bank) + ' ₫';
+            if (EL.assetCash) EL.assetCash.textContent = formatVND(cash) + ' ₫';
+            if (EL.assetBank) EL.assetBank.textContent = formatVND(bank) + ' ₫';
 
             // Render Savings List with Calculations
-            const list = document.getElementById('savings-list');
-            list.innerHTML = '';
+            if (EL.savingsList) {
+                EL.savingsList.innerHTML = '';
+            } else {
+                return;
+            }
 
             savings.forEach(s => {
                 // Calculate Interest
@@ -1196,7 +1219,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
 
                 item.appendChild(progressBar);
-                list.appendChild(item);
+                EL.savingsList.appendChild(item);
             });
 
         } catch (e) {
@@ -1206,27 +1229,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Bulk AI Import Logic ---
-    let detectedTransactions = [];
-    const bulkModal = document.getElementById('bulk-modal');
-    const bulkInputStep = document.getElementById('bulk-input-step');
-    const bulkReviewStep = document.getElementById('bulk-review-step');
-    const bulkLoading = document.getElementById('bulk-loading');
-    const bulkTableBody = document.getElementById('bulk-review-table-body');
-    const bulkCountBadge = document.getElementById('bulk-count-badge');
 
     window.openBulkModal = () => {
-        bulkModal.style.display = 'block';
+        if (bulkModal) bulkModal.style.display = 'block';
         backToBulkInput();
     };
 
     window.closeBulkModal = () => {
-        bulkModal.style.display = 'none';
+        if (bulkModal) bulkModal.style.display = 'none';
     };
 
     window.backToBulkInput = () => {
-        bulkInputStep.style.display = 'block';
-        bulkReviewStep.style.display = 'none';
-        bulkLoading.style.display = 'none';
+        if (EL.bulkInputStep) EL.bulkInputStep.style.display = 'block';
+        if (EL.bulkReviewStep) EL.bulkReviewStep.style.display = 'none';
+        if (EL.bulkLoading) EL.bulkLoading.style.display = 'none';
     };
 
     document.getElementById('bulk-ai-btn')?.addEventListener('click', openBulkModal);
@@ -1239,8 +1255,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!confirm("This is a very long text. Analysis might take longer or hit limits. Continue?")) return;
         }
 
-        bulkInputStep.style.display = 'none';
-        bulkLoading.style.display = 'block';
+        EL.bulkInputStep.style.display = 'none';
+        EL.bulkLoading.style.display = 'block';
 
         try {
             const response = await fetch('/api/ai/bulk-extract', {
@@ -1251,10 +1267,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
 
             if (data.transactions) {
-                detectedTransactions = data.transactions;
+                EL.detectedTransactions = data.transactions;
                 renderBulkReview();
-                bulkLoading.style.display = 'none';
-                bulkReviewStep.style.display = 'block';
+                EL.bulkLoading.style.display = 'none';
+                EL.bulkReviewStep.style.display = 'block';
             } else {
                 alert(data.error || "Could not extract transactions.");
                 backToBulkInput();
@@ -1267,15 +1283,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function renderBulkReview() {
-        bulkTableBody.innerHTML = '';
-        if (detectedTransactions.length === 0) {
-            bulkTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 2rem; color: #94a3b8;">No transactions found in this text.</td></tr>';
+        if (!EL.bulkTableBody) return;
+        EL.bulkTableBody.innerHTML = '';
+        if (EL.detectedTransactions.length === 0) {
+            EL.bulkTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 2rem; color: #94a3b8;">No transactions found in this text.</td></tr>';
             return;
         }
 
         const standardCats = ["Food", "Rent", "Utilities", "Transport", "Groceries", "Shopping", "Entertainment", "Travel", "Health", "Salary", "Bonus", "Investment", "Other Income", "Other"];
 
-        detectedTransactions.forEach((t, index) => {
+        EL.detectedTransactions.forEach((t, index) => {
             const row = document.createElement('tr');
             row.style.borderBottom = '1px solid #f1f5f9';
 
@@ -1301,14 +1318,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </td>
             `;
-            bulkTableBody.appendChild(row);
+            EL.bulkTableBody.appendChild(row);
         });
         updateBulkCount();
     }
 
     function updateBulkCount() {
         const checked = document.querySelectorAll('.bulk-item-check:checked').length;
-        bulkCountBadge.textContent = checked;
+        if (EL.bulkCountBadge) EL.bulkCountBadge.textContent = checked;
     }
 
     document.getElementById('bulk-select-all')?.addEventListener('change', (e) => {
@@ -1316,7 +1333,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateBulkCount();
     });
 
-    bulkTableBody.addEventListener('change', (e) => {
+    EL.bulkTableBody?.addEventListener('change', (e) => {
         if (e.target.classList.contains('bulk-item-check')) updateBulkCount();
     });
 
@@ -1338,7 +1355,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 description: row.querySelector('.bulk-edit-desc').value,
                 category: row.querySelector('.bulk-edit-cat').value,
                 amount: parseFloat(row.querySelector('.bulk-edit-amount').value),
-                type: detectedTransactions[idx].type // Keep original type
+                type: EL.detectedTransactions[idx].type // Keep original type
             });
         });
 
@@ -1365,9 +1382,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     window.onclick = (event) => {
-        if (event.target == bulkModal) closeBulkModal();
-        if (event.target == document.getElementById('edit-modal')) closeModal();
+        if (event.target == EL.bulkModal) closeBulkModal();
+        if (event.target == EL.editModal) closeModal();
     };
-});
-
-
+}, { passive: true });
