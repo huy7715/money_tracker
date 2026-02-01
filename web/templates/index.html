@@ -494,8 +494,15 @@
             <div class="diary-container">
                 <input type="text" id="diary-title" placeholder="Note Title (Optional)"
                     style="width: 100%; padding: 0.8rem; border-radius: 0.6rem; border: 1px solid #e5e7eb; font-family: inherit; font-size: 0.9rem; margin-bottom: 0.5rem; background: rgba(255,255,255,0.7); font-weight: 600;">
-                <textarea id="diary-content" placeholder="Share your thoughts for today..."
-                    style="width: 100%; height: 300px; padding: 1rem; border-radius: 0.8rem; border: 1px solid #e5e7eb; resize: none; font-family: inherit; font-size: 0.95rem; margin-bottom: 1rem; background: rgba(255,255,255,0.5);"></textarea>
+                <div class="diary-toolbar">
+                    <button type="button" onclick="formatDoc('bold')" title="Bold"><b>B</b></button>
+                    <button type="button" onclick="formatDoc('italic')" title="Italic"><i>I</i></button>
+                    <button type="button" onclick="formatDoc('underline')" title="Underline"><u>U</u></button>
+                    <button type="button" onclick="formatDoc('strikeThrough')" title="Strikethrough"><s>S</s></button>
+                    <input type="color" onchange="formatDoc('foreColor', this.value)" title="Text Color">
+                </div>
+                <div id="diary-content" class="rich-editor" contenteditable="true"
+                    data-placeholder="Share your thoughts for today..."></div>
                 <button id="save-diary-btn"
                     style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); margin-bottom: 1.5rem;">Save
                     Note</button>

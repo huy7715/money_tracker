@@ -487,3 +487,73 @@ button:hover {
     border-color: var(--primary) !important;
     box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }
+
+/* Rich Text Editor Styles */
+.diary-toolbar {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid #e5e7eb;
+    border-radius: 0.6rem 0.6rem 0 0;
+    border-bottom: none;
+    align-items: center;
+}
+
+.diary-toolbar button {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: white;
+    color: #374151;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.4rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.diary-toolbar button:hover {
+    background: #f3f4f6;
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.diary-toolbar input[type="color"] {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.4rem;
+    cursor: pointer;
+    background: white;
+}
+
+.rich-editor {
+    width: 100%;
+    min-height: 300px;
+    max-height: 400px;
+    padding: 1rem;
+    border-radius: 0 0 0.8rem 0.8rem;
+    border: 1px solid #e5e7eb;
+    font-family: inherit;
+    font-size: 0.95rem;
+    margin-bottom: 1rem;
+    background: rgba(255, 255, 255, 0.5);
+    overflow-y: auto;
+    outline: none;
+}
+
+.rich-editor:focus {
+    border-color: var(--primary);
+    background: rgba(255, 255, 255, 0.8);
+}
+
+.rich-editor:empty:before {
+    content: attr(data-placeholder);
+    color: #9ca3af;
+    cursor: text;
+}

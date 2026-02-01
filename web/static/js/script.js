@@ -388,18 +388,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function loadDiary(date) {
         if (!EL.diaryContent) return;
-        EL.diaryContent.placeholder = "Loading your thoughts...";
+        EL.diaryContent.innerHTML = "";
         if (EL.diaryTitle) EL.diaryTitle.value = "";
 
         try {
             const response = await fetch(`/api/diary?date=${date}`);
             const data = await response.json();
-            EL.diaryContent.value = data.content || "";
+            EL.diaryContent.innerHTML = data.content || "";
             if (EL.diaryTitle) EL.diaryTitle.value = data.title || "";
-            EL.diaryContent.placeholder = "Share your thoughts for today...";
         } catch (error) {
             console.error('Error loading diary:', error);
-            EL.diaryContent.placeholder = "Failed to load thoughts.";
+            EL.diaryContent.innerHTML = "Failed to load thoughts.";
         }
     }
 
@@ -490,7 +489,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     EL.saveDiaryBtn?.addEventListener('click', async () => {
         const date = EL.diaryDate.value;
-        const content = EL.diaryContent.value;
+        const content = EL.diaryContent.innerHTML;
         const title = EL.diaryTitle ? EL.diaryTitle.value : "";
         if (!date) return;
 
@@ -1231,12 +1230,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Bulk AI Import Logic ---
 
     window.openBulkModal = () => {
-        if (bulkModal) bulkModal.style.display = 'block';
+        if (EL.bulkModal) EL.bulkModal.style.display = 'block';
         backToBulkInput();
     };
 
     window.closeBulkModal = () => {
-        if (bulkModal) bulkModal.style.display = 'none';
+        if (EL.bulkModal) EL.bulkModal.style.display = 'none';
     };
 
     window.backToBulkInput = () => {
@@ -1385,4 +1384,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (event.target == EL.bulkModal) closeBulkModal();
         if (event.target == EL.editModal) closeModal();
     };
-}, { passive: true });
+
+    // ========== RICH TEXT EDITOR ==========
+    window.formatDoc = (command, value = null) => {
+        document.execCommand(command, false, value);
+        if (EL.diaryContent) EL.diaryContent.focus();
+    };
+
+});
