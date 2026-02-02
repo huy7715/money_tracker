@@ -3,6 +3,8 @@ import csv
 import io
 from money_tracker.backend.manager import FinanceManager
 import os
+import subprocess
+import json
 from datetime import datetime
 
 app = Flask(__name__)
@@ -308,6 +310,87 @@ def get_assets():
         return jsonify({'error': str(e)}), 500
 
 
+
+@app.route('/ag-quota')
+def ag_quota_dashboard():
+    return render_template('ag_quota.html')
+
+@app.route('/api/ag-quota')
+def get_ag_quota_data():
+    try:
+        # Path to the ag-quota binary
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        exe_path = os.path.join(base_dir, 'anti-gravity-quota', 'ag-quota.exe')
+        
+        # Run the command with --all and --json flags
+        # Use shell=True on Windows to avoid some path issues, but direct list is safer if exe_path is correct.
+        # Ensure we capture stderr to debug.
+        result = subprocess.run(
+            [exe_path, 'quota', '--all', '--json'], 
+            capture_output=True, 
+            text=True, 
+            cwd=os.path.dirname(exe_path),
+            encoding='utf-8', # Force utf-8
+            errors='replace'
+        )
+        
+        if result.returncode != 0:
+            return jsonify({'error': f"Command failed: {result.stderr}"}), 500
+            
+        # Parse the NDJSON output (multiple JSON objects, one per line or concatenated)
+        output = result.stdout.strip()
+        data = []
+        if output:
+            # Attempt to split by closing brace + newline or just sequential parsing if possible
+            # Simple approach: split by lines, try parse each.
+            # If formatted with newlines (pretty printed?), this might be harder.
+            # The CLI output shown in tool use seems to be pretty-printed.
+            # Use a regex or simple decoder to handle concatenated JSONs.
+            
+            # Since the CLI output shown was pretty-printed, we can't just split by line.
+            # We will use raw string manipulation to find separate json objects.
+            # Or better, we can assume the CLI outputs valid separate JSONs.
+            decoder = json.JSONDecoder()
+            pos = 0
+            while pos < len(output):
+                try:
+                    obj, idx = decoder.raw_decode(output[pos:])
+                    data.append(obj)
+                    pos += idx
+                    # Skip whitespace
+                    while pos < len(output) and output[pos].isspace():
+                        pos += 1
+                except json.JSONDecodeError:
+                    break
+                    
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/add-account', methods=['POST'])
+def add_account():
+    try:
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        exe_path = os.path.join(base_dir, 'anti-gravity-quota', 'ag-quota.exe')
+        
+        # Start the login process. Since it interacts with the browser, we start it detached?
+        # No, 'login' command blocks until success. We want to wait for it so the UI knows when it's done.
+        # But requests have timeout. 
+        # For now, we'll run it synchronously. The user has to click "Login" in browser quickly.
+        
+        result = subprocess.run(
+            [exe_path, 'login'],
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(exe_path)
+        )
+        
+        if result.returncode != 0:
+             return jsonify({'success': False, 'error': result.stderr}), 500
+             
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
