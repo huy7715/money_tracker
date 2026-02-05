@@ -7,6 +7,7 @@
     <title>Money Tracker</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
@@ -500,7 +501,9 @@
                     <button type="button" onclick="formatDoc('italic')" title="Italic"><i>I</i></button>
                     <button type="button" onclick="formatDoc('underline')" title="Underline"><u>U</u></button>
                     <button type="button" onclick="formatDoc('strikeThrough')" title="Strikethrough"><s>S</s></button>
-                    <input type="color" onchange="formatDoc('foreColor', this.value)" title="Text Color">
+                    <button type="button" onclick="addChecklist()" title="Checklist"><i
+                            class="fas fa-check-square"></i></button>
+                    <input type="color" id="diary-color-picker" title="Text Color" style="margin-left: 5px;">
                 </div>
                 <div id="diary-content" class="rich-editor" contenteditable="true"
                     data-placeholder="Share your thoughts for today..."></div>

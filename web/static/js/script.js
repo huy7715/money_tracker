@@ -487,14 +487,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    EL.saveDiaryBtn?.addEventListener('click', async () => {
+    async function saveDiary(isAuto = false) {
         const date = EL.diaryDate.value;
         const content = EL.diaryContent.innerHTML;
         const title = EL.diaryTitle ? EL.diaryTitle.value : "";
-        if (!date) return;
+        if (!date || !content.trim()) return;
 
-        EL.saveDiaryBtn.textContent = "Saving...";
-        EL.saveDiaryBtn.disabled = true;
+        if (EL.saveDiaryBtn) {
+            EL.saveDiaryBtn.textContent = isAuto ? "Auto-saving..." : "Saving...";
+            if (!isAuto) EL.saveDiaryBtn.disabled = true;
+        }
 
         try {
             const response = await fetch('/api/diary', {
@@ -503,24 +505,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({ date, content, title })
             });
             if (response.ok) {
-                EL.saveDiaryBtn.textContent = "Saved! ✓";
-                loadDiaryHistory(); // Refresh history list
+                if (EL.saveDiaryBtn) EL.saveDiaryBtn.textContent = isAuto ? "Auto-saved! ✓" : "Saved! ✓";
+                loadDiaryHistory();
                 setTimeout(() => {
-                    EL.saveDiaryBtn.textContent = "Save Note";
-                    EL.saveDiaryBtn.disabled = false;
+                    if (EL.saveDiaryBtn) {
+                        EL.saveDiaryBtn.textContent = "Save Note";
+                        EL.saveDiaryBtn.disabled = false;
+                    }
                 }, 2000);
-            } else {
+            } else if (!isAuto) {
                 alert('Failed to save note');
-                EL.saveDiaryBtn.textContent = "Save Note";
-                EL.saveDiaryBtn.disabled = false;
             }
         } catch (error) {
             console.error('Error saving diary:', error);
-            alert('An error occurred while saving');
-            EL.saveDiaryBtn.textContent = "Save Note";
-            EL.saveDiaryBtn.disabled = false;
+            if (!isAuto) alert('An error occurred while saving');
+        } finally {
+            if (!isAuto && EL.saveDiaryBtn) {
+                EL.saveDiaryBtn.disabled = false;
+            }
         }
-    }, { passive: true });
+    }
+
+    const debouncedAutoSave = debounce(() => saveDiary(true), 2000);
+
+    EL.saveDiaryBtn?.addEventListener('click', () => saveDiary(false));
+    EL.diaryTitle?.addEventListener('input', debouncedAutoSave);
+    EL.diaryContent?.addEventListener('input', debouncedAutoSave);
 
     // ========== SIDEBAR STATS ==========
     async function updateSidebarStats(transactions, monthOverride = null) {
@@ -1386,9 +1396,97 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // ========== RICH TEXT EDITOR ==========
+    let savedSelection = null;
+
+    function saveSelection() {
+        if (window.getSelection) {
+            const sel = window.getSelection();
+            if (sel.getRangeAt && sel.rangeCount) {
+                return sel.getRangeAt(0);
+            }
+        }
+        return null;
+    }
+
+    function restoreSelection(range) {
+        if (range) {
+            if (window.getSelection) {
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(range);
+            }
+        }
+    }
+
     window.formatDoc = (command, value = null) => {
         document.execCommand(command, false, value);
         if (EL.diaryContent) EL.diaryContent.focus();
     };
+
+    // Color picker fix: save selection on click, restore on change
+    const colorPicker = document.getElementById('diary-color-picker');
+    colorPicker?.addEventListener('mousedown', () => {
+        savedSelection = saveSelection();
+    });
+
+    colorPicker?.addEventListener('input', (e) => {
+        restoreSelection(savedSelection);
+        formatDoc('foreColor', e.target.value);
+    });
+
+    // Add Checklist Function
+    window.addChecklist = () => {
+        if (!EL.diaryContent) return;
+        EL.diaryContent.focus();
+
+        const timestamp = Date.now();
+        const checkboxId = `check-${timestamp}`;
+
+        // Insert a new checklist item at the cursor
+        // Added: logic to sync 'checked' attribute in the onchange handler
+        const checklistHtml = `
+            <div class="checklist-item" contenteditable="false">
+                <input type="checkbox" id="${checkboxId}" onchange="this.parentElement.classList.toggle('completed', this.checked); if(this.checked) this.setAttribute('checked', ''); else this.removeAttribute('checked');">
+                <span class="checklist-text" contenteditable="true" style="margin-left: 5px;">New task</span>
+            </div>
+            <div><br></div>
+        `;
+
+        document.execCommand('insertHTML', false, checklistHtml);
+    };
+
+    // Event delegation to catch checkbox changes if they are loaded from history
+    EL.diaryContent?.addEventListener('change', (e) => {
+        if (e.target.type === 'checkbox') {
+            const item = e.target.closest('.checklist-item');
+            if (item) {
+                const isChecked = e.target.checked;
+                item.classList.toggle('completed', isChecked);
+
+                // CRITICAL: Synchronize the 'checked' attribute so innerHTML captures it for saving
+                if (isChecked) {
+                    e.target.setAttribute('checked', '');
+                } else {
+                    e.target.removeAttribute('checked');
+                }
+
+                saveDiary(true); // Trigger auto-save immediately on state change
+            }
+        }
+    });
+
+    // Handle Enter key in checklist text to create new item
+    EL.diaryContent?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            const selection = window.getSelection();
+            const anchorNode = selection.anchorNode;
+            const checklistText = anchorNode?.parentElement?.closest('.checklist-text');
+
+            if (checklistText) {
+                e.preventDefault();
+                addChecklist();
+            }
+        }
+    });
 
 });
