@@ -4,6 +4,22 @@ const DOT_REGEX = /\./g;
 const COMMA_REGEX = /,/g;
 
 document.addEventListener('DOMContentLoaded', () => {
+    // --- Socket.IO Real-time Sync ---
+    const socket = io();
+    socket.on('data_updated', (data) => {
+        console.log('Real-time update received:', data);
+        if (data.type === 'diary') {
+            const currentDiaryDate = EL.diaryDate ? EL.diaryDate.value : null;
+            if (data.date === currentDiaryDate) {
+                loadDiary(data.date);
+            }
+            loadDiaryHistory();
+        } else {
+            const selectedMonth = EL.monthSelector ? EL.monthSelector.value : null;
+            fetchData(selectedMonth);
+        }
+    });
+
     // --- Cached DOM Elements (js-cache-property-access inspired) ---
     const EL = {
         form: document.getElementById('transaction-form'),
@@ -359,7 +375,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (response.ok) {
                 EL.form.reset();
-                fetchData();
+                const selectedMonth = EL.monthSelector ? EL.monthSelector.value : null;
+                fetchData(selectedMonth);
             } else {
                 alert('Failed to add transaction');
             }
@@ -767,7 +784,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             const response = await fetch(`/delete/${id}`, { method: 'DELETE' });
-            if (response.ok) fetchData();
+            if (response.ok) {
+                const selectedMonth = EL.monthSelector ? EL.monthSelector.value : null;
+                fetchData(selectedMonth);
+            }
             else alert('Failed to delete');
         } catch (error) {
             console.error('Error deleting:', error);
@@ -829,7 +849,8 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (response.ok) {
                 closeModal();
-                fetchData();
+                const selectedMonth = EL.monthSelector ? EL.monthSelector.value : null;
+                fetchData(selectedMonth);
             } else {
                 alert('Failed to update');
             }
@@ -838,8 +859,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Initial fetch
-    fetchData();
+    // Initial fetch handled by updateAvailableMonths() or monthSelector logic
+    // Removing redundant global call
 
 
     // Load saved background
@@ -917,7 +938,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Reset label text if it was changed
                 const label = EL.budgetLimit.parentElement.querySelector('label');
                 if (label) label.textContent = 'Monthly Limit';
-                fetchBudgetStatus();
+                const selectedMonth = EL.monthSelector ? EL.monthSelector.value : null;
+                fetchData(selectedMonth); // Refresh everything including budget status
             } else {
                 alert('Failed to set budget');
             }
@@ -1055,7 +1077,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 method: 'DELETE'
             });
             if (response.ok) {
-                fetchBudgetStatus();
+                const selectedMonth = EL.monthSelector ? EL.monthSelector.value : null;
+                fetchBudgetStatus(selectedMonth);
             } else {
                 alert('Failed to delete budget');
             }

@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, jsonify, Response
+from flask_socketio import SocketIO, emit
 import csv
 import io
 from money_tracker.backend.manager import FinanceManager
@@ -8,6 +9,7 @@ import json
 from datetime import datetime
 
 app = Flask(__name__)
+socketio = SocketIO(app, cors_allowed_origins="*")
 # Initialize manager with a database in the root directory
 # ../../../money_tracker.db relative to money_tracker/web/app.py
 root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -46,6 +48,7 @@ def add_transaction():
             date=data.get('date'),
             asset_id=data.get('asset_id')
         )
+        socketio.emit('data_updated', {'type': 'transaction', 'action': 'add'})
         return jsonify({'success': True}), 201
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 400
@@ -54,6 +57,7 @@ def add_transaction():
 def delete_transaction(transaction_id):
     try:
         manager.delete_transaction(transaction_id)
+        socketio.emit('data_updated', {'type': 'transaction', 'action': 'delete'})
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 400
@@ -70,6 +74,7 @@ def update_transaction(transaction_id):
             description=data.get('description', ''),
             date=data['date']
         )
+        socketio.emit('data_updated', {'type': 'transaction', 'action': 'update'})
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 400
@@ -225,6 +230,7 @@ def set_budget():
                 monthly_limit=amount,
                 month=month
             )
+        socketio.emit('data_updated', {'type': 'budget', 'action': 'set'})
         return jsonify({'success': True}), 201
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 400
@@ -243,6 +249,7 @@ def delete_budget(category):
     try:
         month = request.args.get('month')
         manager.delete_budget(category, month)
+        socketio.emit('data_updated', {'type': 'budget', 'action': 'delete'})
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 400
@@ -288,6 +295,7 @@ def save_diary():
         if not date:
             return jsonify({'error': 'No date provided'}), 400
         manager.save_diary(date, content, title)
+        socketio.emit('data_updated', {'type': 'diary', 'date': date})
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -393,4 +401,4 @@ def add_account():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)

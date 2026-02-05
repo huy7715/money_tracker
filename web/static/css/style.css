@@ -557,6 +557,7 @@ button:hover {
     color: #9ca3af;
     cursor: text;
 }
+
 /* Checklist Styles */
 .checklist-item {
     display: flex;
@@ -602,4 +603,104 @@ button:hover {
     cursor: pointer;
     vertical-align: middle;
     margin-left: 0.5rem;
+}
+
+/* =========================================
+   RESPONSIVE DESIGN (Mobile & Tablet)
+   ========================================= */
+@media (max-width: 1024px) {
+    .app-layout {
+        grid-template-columns: 1fr;
+        /* Stack everything vertically */
+        padding: 1rem;
+        gap: 2rem;
+    }
+
+    .sidebar {
+        width: 100%;
+        position: relative;
+        /* No longer sticky */
+        top: 0;
+        animation: none;
+        opacity: 1;
+        margin-bottom: 1rem;
+    }
+
+    .left-sidebar {
+        order: 2;
+        /* Move stats below main content if desired, or keep at top. Let's keep top for quick stats. Order 1 default. */
+    }
+
+    .container {
+        width: 100%;
+        order: 1;
+        /* Main content first on mobile? Or standard flow? Standard flow is Sidebar -> Main -> Right. */
+        /* Let's Try: Main Content First, Stats below */
+        order: 0;
+    }
+
+    .left-sidebar {
+        order: 1;
+    }
+
+    .right-sidebar {
+        order: 2;
+    }
+
+    /* Hide some less critical elements or make them collapsible? 
+       For now, just stacking is safest. */
+
+    header h1 {
+        font-size: 1.5rem;
+        /* Smaller title */
+    }
+
+    .balance-card .amount {
+        font-size: 2.5rem;
+        /* Smaller balance text */
+    }
+}
+
+@media (max-width: 768px) {
+    body {
+        font-size: 16px;
+        /* Prevent IOS zoom on focus */
+    }
+
+    .app-layout {
+        padding: 0.5rem;
+    }
+
+    .container {
+        padding: 0;
+    }
+
+    /* Improve touch targets */
+    .btn,
+    button,
+    select,
+    input {
+        min-height: 44px;
+    }
+
+    /* Stack budget form */
+    .budget-form-wrapper {
+        grid-template-columns: 1fr;
+    }
+
+    .chart-container {
+        height: 250px !important;
+    }
+
+    /* Adjust Rich Editor for mobile */
+    .rich-editor {
+        min-height: 200px;
+    }
+
+    /* Modal full width */
+    .modal-content {
+        width: 95%;
+        margin: 1rem;
+        padding: 1.5rem;
+    }
 }
