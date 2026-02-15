@@ -24,99 +24,99 @@ class Storage:
         return conn
 
     def init_db(self):
-        conn = self._get_conn()
-        cursor = conn.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS transactions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                amount REAL NOT NULL,
-                category TEXT NOT NULL,
-                type TEXT NOT NULL,
-                description TEXT,
-                date TEXT NOT NULL,
-                asset_id INTEGER
-            )
-        ''')
-        # Add column if it doesn't exist (for existing DBs)
-        try:
-            cursor.execute("ALTER TABLE transactions ADD COLUMN asset_id INTEGER")
-        except sqlite3.OperationalError:
-            pass # Column already exists
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS budgets (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                category TEXT NOT NULL,
-                monthly_limit REAL NOT NULL,
-                month TEXT NOT NULL,
-                UNIQUE(category, month)
-            )
-        ''')
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS diary (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                date TEXT UNIQUE NOT NULL,
-                content TEXT NOT NULL,
-                title TEXT
-            )
-        ''')
-        # Add title column if it doesn't exist
-        try:
-            cursor.execute("ALTER TABLE diary ADD COLUMN title TEXT")
-        except sqlite3.OperationalError:
-            pass # Column already exists
-        
-        # Assets Table (Cash, Bank, Savings)
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS assets (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT UNIQUE NOT NULL,
-                type TEXT NOT NULL, -- 'Cash', 'Bank', 'Savings', 'Cumulative'
-                amount REAL NOT NULL,
-                interest_rate REAL DEFAULT 0,
-                term_months INTEGER DEFAULT 0,
-                start_date TEXT,
-                end_date TEXT,
-                auto_contribution REAL DEFAULT 0, -- Amount to auto-add monthly
-                last_updated_month TEXT -- 'YYYY-MM' of last contribution
-            )
-        ''')
-
-        # Seeding: Insert user's specific assets
-        cursor.execute("SELECT count(*) FROM assets")
-        if cursor.fetchone()[0] == 0:
-            # Cash: 4.000.000
-            cursor.execute("INSERT INTO assets (name, type, amount) VALUES (?, ?, ?)", ("Cash", "Cash", 4000000))
-            
-            # Bank: 22.000.000
-            cursor.execute("INSERT INTO assets (name, type, amount) VALUES (?, ?, ?)", ("Bank Account", "Bank", 22000000))
-            
-            # Savings 1: 90m, 3.5%, ends 16/06/2026
-            cursor.execute("INSERT INTO assets (name, type, amount, interest_rate, end_date) VALUES (?, ?, ?, ?, ?)", 
-                           ("Long Term Savings", "Savings", 90000000, 3.5, "2026-06-16"))
-            
-            # Savings 2: 12.5m, 5.2%, ends 29/01/2027
-            cursor.execute("INSERT INTO assets (name, type, amount, interest_rate, end_date, start_date) VALUES (?, ?, ?, ?, ?, ?)", 
-                           ("Savings Book 1", "Savings", 12500000, 5.2, "2027-01-29", "2024-01-29"))
-            
-            # Savings 3: 12.5m, 5.2%, ends 29/01/2027
-            cursor.execute("INSERT INTO assets (name, type, amount, interest_rate, end_date, start_date) VALUES (?, ?, ?, ?, ?, ?)", 
-                           ("Savings Book 2", "Savings", 12500000, 5.2, "2027-01-29", "2024-01-29"))
-                           
-            # Cumulative Fund: 3m initial, 2m monthly, 5.2%, ends 29/01/2027
-            # Created "yesterday" (2026-01-29 presumably based on user context, or simply Jan 2026)
-            # Auto-contribution set to 2,000,000
-            # last_updated_month set to '2026-01' so it doesn't trigger again for this Jan.
+        with self._conn() as conn:
+            cursor = conn.cursor()
             cursor.execute('''
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ''', ("Cumulative Fund", "Cumulative", 3000000, 5.2, "2027-01-29", "2026-01-29", 2000000, "2026-01"))
-        
-        # Performance Indexes
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_transactions_asset ON transactions(asset_id)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_diary_date ON diary(date)")
+                CREATE TABLE IF NOT EXISTS transactions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    amount REAL NOT NULL,
+                    category TEXT NOT NULL,
+                    type TEXT NOT NULL,
+                    description TEXT,
+                    date TEXT NOT NULL,
+                    asset_id INTEGER
+                )
+            ''')
+            # Add column if it doesn't exist (for existing DBs)
+            try:
+                cursor.execute("ALTER TABLE transactions ADD COLUMN asset_id INTEGER")
+            except sqlite3.OperationalError:
+                pass # Column already exists
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS budgets (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    category TEXT NOT NULL,
+                    monthly_limit REAL NOT NULL,
+                    month TEXT NOT NULL,
+                    UNIQUE(category, month)
+                )
+            ''')
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS diary (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    date TEXT UNIQUE NOT NULL,
+                    content TEXT NOT NULL,
+                    title TEXT
+                )
+            ''')
+            # Add title column if it doesn't exist
+            try:
+                cursor.execute("ALTER TABLE diary ADD COLUMN title TEXT")
+            except sqlite3.OperationalError:
+                pass # Column already exists
+            
+            # Assets Table (Cash, Bank, Savings)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS assets (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT UNIQUE NOT NULL,
+                    type TEXT NOT NULL, -- 'Cash', 'Bank', 'Savings', 'Cumulative'
+                    amount REAL NOT NULL,
+                    interest_rate REAL DEFAULT 0,
+                    term_months INTEGER DEFAULT 0,
+                    start_date TEXT,
+                    end_date TEXT,
+                    auto_contribution REAL DEFAULT 0, -- Amount to auto-add monthly
+                    last_updated_month TEXT -- 'YYYY-MM' of last contribution
+                )
+            ''')
 
-        conn.commit()
-        conn.close()
+            # Seeding: Insert user's specific assets
+            cursor.execute("SELECT count(*) FROM assets")
+            if cursor.fetchone()[0] == 0:
+                # Cash: 4.000.000
+                cursor.execute("INSERT INTO assets (name, type, amount) VALUES (?, ?, ?)", ("Cash", "Cash", 4000000))
+                
+                # Bank: 22.000.000
+                cursor.execute("INSERT INTO assets (name, type, amount) VALUES (?, ?, ?)", ("Bank Account", "Bank", 22000000))
+                
+                # Savings 1: 90m, 3.5%, ends 16/06/2026
+                cursor.execute("INSERT INTO assets (name, type, amount, interest_rate, end_date) VALUES (?, ?, ?, ?, ?)", 
+                               ("Long Term Savings", "Savings", 90000000, 3.5, "2026-06-16"))
+                
+                # Savings 2: 12.5m, 5.2%, ends 29/01/2027
+                cursor.execute("INSERT INTO assets (name, type, amount, interest_rate, end_date, start_date) VALUES (?, ?, ?, ?, ?, ?)", 
+                               ("Savings Book 1", "Savings", 12500000, 5.2, "2027-01-29", "2024-01-29"))
+                
+                # Savings 3: 12.5m, 5.2%, ends 29/01/2027
+                cursor.execute("INSERT INTO assets (name, type, amount, interest_rate, end_date, start_date) VALUES (?, ?, ?, ?, ?, ?)", 
+                               ("Savings Book 2", "Savings", 12500000, 5.2, "2027-01-29", "2024-01-29"))
+                               
+                # Cumulative Fund: 3m initial, 2m monthly, 5.2%, ends 29/01/2027
+                # Created "yesterday" (2026-01-29 presumably based on user context, or simply Jan 2026)
+                # Auto-contribution set to 2,000,000
+                # last_updated_month set to '2026-01' so it doesn't trigger again for this Jan.
+                cursor.execute('''
+                    INSERT INTO assets (name, type, amount, interest_rate, end_date, start_date, auto_contribution, last_updated_month)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ''', ("Cumulative Fund", "Cumulative", 3000000, 5.2, "2027-01-29", "2026-01-29", 2000000, "2026-01"))
+            
+            # Performance Indexes
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_transactions_asset ON transactions(asset_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_diary_date ON diary(date)")
+            
+            conn.commit()
 
     def add_transaction(self, transaction: Transaction):
         with self._conn() as conn:
@@ -425,6 +425,43 @@ class Storage:
                     adjustment -= row['total']
             return adjustment
     
+    def add_asset(self, name, type, amount, interest_rate=0, term_months=0, start_date=None, end_date=None, auto_contribution=0, last_updated_month=None):
+        with self._conn() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute('''
+                    INSERT INTO assets (name, type, amount, interest_rate, term_months, start_date, end_date, auto_contribution, last_updated_month)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (name, type, amount, interest_rate, term_months, start_date, end_date, auto_contribution, last_updated_month))
+                conn.commit()
+                return cursor.lastrowid
+            except sqlite3.IntegrityError:
+                return None # Asset name already exists
+
+    def update_asset(self, asset_id, name, type, amount, interest_rate, term_months, start_date, end_date, auto_contribution, last_updated_month):
+        with self._conn() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute('''
+                    UPDATE assets 
+                    SET name = ?, type = ?, amount = ?, interest_rate = ?, term_months = ?, start_date = ?, end_date = ?, auto_contribution = ?, last_updated_month = ?
+                    WHERE id = ?
+                ''', (name, type, amount, interest_rate, term_months, start_date, end_date, auto_contribution, last_updated_month, asset_id))
+                conn.commit()
+                return True
+            except sqlite3.IntegrityError:
+                return False
+
+    def delete_asset(self, asset_id):
+        with self._conn() as conn:
+            cursor = conn.cursor()
+            # First, decouple transactions from this asset
+            cursor.execute("UPDATE transactions SET asset_id = NULL WHERE asset_id = ?", (asset_id,))
+            # Then delete the asset
+            cursor.execute("DELETE FROM assets WHERE id = ?", (asset_id,))
+            conn.commit()
+            return True
+
     def update_asset_balance(self, asset_id, new_amount, last_updated_month=None):
         with self._conn() as conn:
             cursor = conn.cursor()

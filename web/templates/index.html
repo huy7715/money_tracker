@@ -6,7 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Money Tracker</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -41,6 +42,7 @@
                 <h3>🔗 Quick Links</h3>
                 <a href="/reports" class="sidebar-link">Monthly Reports</a>
                 <a href="/export" class="sidebar-link">Export Data</a>
+                <a href="/api/backup" class="sidebar-link" target="_blank">Backup Data</a>
                 <a href="/ag-quota" class="sidebar-link" style="color: #10b981; font-weight: 600;">Quota Dashboard</a>
             </div>
         </aside>
@@ -74,13 +76,12 @@
 
             <main>
                 <!-- Chart Section -->
-                <section class="chart-section"
-                    style="background: white; padding: 1.5rem; border-radius: 1rem; margin-bottom: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); animation-delay: 0.2s;">
+                <section class="chart-section">
                     <div
                         style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                         <h3 style="margin: 0;">Expense Breakdown</h3>
                         <a href="/reports"
-                            style="text-decoration: none; background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); color: white; padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.875rem; font-weight: 500;">📊
+                            style="text-decoration: none; background: var(--primary); color: white; padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.875rem; font-weight: 500; transition: all 0.2s;">📊
                             Monthly Reports</a>
                     </div>
                     <div class="chart-container" style="position: relative; height:300px; width:100%">
@@ -89,8 +90,7 @@
                 </section>
 
                 <!-- Budget Manager Section -->
-                <section class="budget-manager"
-                    style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 1.5rem; border-radius: 1rem; margin-bottom: 1.5rem; color: white; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); animation-delay: 0.3s;">
+                <section class="budget-manager-section">
                     <div
                         style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                         <h3 style="margin: 0;">💰 Budget Manager</h3>
@@ -127,83 +127,7 @@
                         </div>
                     </div>
 
-                    <style>
-                        /* Dynamic Budget Form Animations */
-                        .budget-input-group:focus-within {
-                            /* Sliding effect: shrink category, expand input, shrink button */
-                            grid-template-columns: 100px 1.5fr 60px;
-                        }
 
-                        .budget-input-group:focus-within .budget-select {
-                            font-size: 0.85rem;
-                            opacity: 0.8;
-                        }
-
-                        .budget-input-group:focus-within .budget-input {
-                            box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.3);
-                            font-size: 1.1rem;
-                        }
-
-                        .budget-input-group:focus-within .budget-btn {
-                            padding: 0;
-                            border-radius: 12px;
-                            width: 50px;
-                            height: 50px;
-                            margin-left: auto;
-                            box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.2);
-                            animation: pulse-green 2s infinite;
-                        }
-
-                        @keyframes pulse-green {
-                            0% {
-                                transform: scale(1);
-                            }
-
-                            50% {
-                                transform: scale(1.05);
-                            }
-
-                            100% {
-                                transform: scale(1);
-                            }
-                        }
-
-                        /* State Management for Button Content */
-                        .budget-btn .btn-icon {
-                            display: none;
-                            font-size: 1.5rem;
-                        }
-
-                        .budget-input-group:focus-within .budget-btn .btn-text {
-                            display: none;
-                        }
-
-                        .budget-input-group:focus-within .budget-btn .btn-icon {
-                            display: block;
-                        }
-
-                        /* Interactive hover to reveal detail even when focused */
-                        .budget-btn:hover {
-                            transform: translateY(-2px);
-                            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-                            background: #f0fdf4;
-                        }
-
-                        .budget-input-group:focus-within .budget-btn:hover {
-                            width: 140px;
-                            padding: 0 1.2rem;
-                            border-radius: 0.75rem;
-                            margin-left: 0;
-                        }
-
-                        .budget-input-group:focus-within .budget-btn:hover .btn-text {
-                            display: block;
-                        }
-
-                        .budget-input-group:focus-within .budget-btn:hover .btn-icon {
-                            display: none;
-                        }
-                    </style>
 
                     <!-- Budget Status List -->
                     <div id="budget-list" style="display: flex; flex-direction: column; gap: 0.75rem;">
@@ -212,51 +136,40 @@
                 </section>
 
                 <!-- Assets Overview Section -->
-                <section class="assets-overview"
-                    style="background: linear-gradient(135deg, #0e7490 0%, #0891b2 100%); padding: 1.5rem; border-radius: 1rem; margin-bottom: 1.5rem; color: white; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); animation-delay: 0.4s;">
-                    <div
-                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                        <h3 style="margin: 0;">🗃️ My Assets & Savings</h3>
+                <section class="assets-overview bg-gradient-blue shadow-lg rounded-xl mb-6 delay-400 text-white p-6">
+                    <div class="section-header">
+                        <h3 class="section-title">🗃️ My Assets & Savings</h3>
+                        <button onclick="openAssetModal()" class="fab" title="Add New Asset">
+                            <i class="fas fa-plus"></i>
+                        </button>
                     </div>
 
-                    <div id="assets-loading" style="text-align: center; opacity: 0.8; font-size: 0.9rem;">
+                    <div id="assets-loading" class="text-center text-white-90 text-sm">
                         Loading assets...
                     </div>
 
                     <div id="assets-content" style="display: none;">
                         <!-- Liquid Assets -->
-                        <div style="margin-bottom: 1.5rem;">
-                            <h4
-                                style="margin: 0 0 0.5rem 0; font-size: 0.9rem; text-transform: uppercase; opacity: 0.9; letter-spacing: 0.05em;">
+                        <div class="mb-6">
+                            <h4 class="asset-type-header uppercase tracking-wider opacity-90 text-sm mb-2">
                                 Liquid Assets</h4>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
-                                <div
-                                    style="background: rgba(255,255,255,0.15); padding: 1rem; border-radius: 0.75rem; border: 1px solid rgba(255,255,255,0.2);">
-                                    <div style="font-size: 0.8rem; opacity: 0.8;">Cash</div>
-                                    <div style="font-size: 1.25rem; font-weight: 700;" id="asset-cash">0 ₫</div>
-                                </div>
-                                <div
-                                    style="background: rgba(255,255,255,0.15); padding: 1rem; border-radius: 0.75rem; border: 1px solid rgba(255,255,255,0.2);">
-                                    <div style="font-size: 0.8rem; opacity: 0.8;">Bank</div>
-                                    <div style="font-size: 1.25rem; font-weight: 700;" id="asset-bank">0 ₫</div>
-                                </div>
+                            <div id="liquid-assets-list" class="asset-grid">
+                                <!-- Liquid assets injected here -->
                             </div>
                         </div>
 
                         <!-- Savings -->
                         <div>
-                            <h4
-                                style="margin: 0 0 0.5rem 0; font-size: 0.9rem; text-transform: uppercase; opacity: 0.9; letter-spacing: 0.05em;">
+                            <h4 class="asset-type-header uppercase tracking-wider opacity-90 text-sm mb-2">
                                 Savings</h4>
-                            <div id="savings-list" style="display: flex; flex-direction: column; gap: 0.75rem;">
-                                <!-- Savings items will be injected here -->
+                            <div id="savings-assets-list" class="asset-grid">
+                                <!-- Savings assets injected here -->
                             </div>
                         </div>
                     </div>
                 </section>
 
-                <section class="ai-assistant"
-                    style="background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); padding: 1.5rem; border-radius: 1rem; margin-bottom: 1.5rem; color: white; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); animation-delay: 0.5s;">
+                <section class="ai-assistant-section">
                     <div
                         style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                         <h3 style="margin: 0;">✨ Magic Assistant</h3>
@@ -278,8 +191,11 @@
                         budget
                         to 5m"</p>
                     <div class="ai-container" style="display: flex; gap: 0.5rem; align-items: stretch;">
-                        <input type="text" id="ai-input" placeholder="Type here (e.g. 'Coffee 30k')..."
-                            autocomplete="off">
+                        <input type="text" id="ai-input" placeholder="Type or use 🎤 voice..." autocomplete="off">
+                        <button id="voice-btn" title="Voice Input"
+                            style="background: rgba(255,255,255,0.2); border: 2px solid rgba(255,255,255,0.3); border-radius: 0.75rem; padding: 0 1rem; cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; justify-content: center;">
+                            <span id="voice-icon" style="font-size: 1.3rem;">🎤</span>
+                        </button>
                         <button id="ai-btn">
                             <span class="btn-text">Ask AI</span>
                             <span class="btn-icon">✨</span>
@@ -288,114 +204,11 @@
                             <span style="animation: spin 1s linear infinite; font-size: 1.5rem;">⏳</span>
                         </div>
                     </div>
-                    <style>
-                        /* Specific Styles for AI Section to override globals */
-                        .ai-container input {
-                            flex: 1;
-                            /* Take available space */
-                            min-width: 0;
-                            /* Allow shrinking below content size if needed */
-                            padding: 1rem;
-                            border-radius: 0.75rem;
-                            border: 2px solid rgba(255, 255, 255, 0.3);
-                            outline: none;
-                            font-size: 1.1rem;
-                            color: #1f2937 !important;
-                            /* Force dark text */
-                            background: white !important;
-                            caret-color: #6366f1;
-                            transition: all 0.3s ease;
-                        }
+                    <div id="voice-status"
+                        style="display: none; margin-top: 0.75rem; padding: 0.5rem 1rem; background: rgba(255,255,255,0.2); border-radius: 0.5rem; font-size: 0.9rem;">
+                        <span id="voice-status-text">🎤 Listening...</span>
+                    </div>
 
-                        .ai-container input::placeholder {
-                            color: #9ca3af;
-                        }
-
-                        .ai-container input:focus {
-                            border-color: white;
-                            box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.2);
-                        }
-
-                        .ai-container button {
-                            width: auto !important;
-                            /* CRITICAL: Override global 100% width */
-                            background: white;
-                            color: #6366f1;
-                            border: none;
-                            padding: 0 1.5rem;
-                            border-radius: 0.75rem;
-                            font-weight: 700;
-                            cursor: pointer;
-                            font-size: 1.1rem;
-                            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-                            display: flex;
-                            align-items: center;
-                            gap: 0.5rem;
-                            white-space: nowrap;
-                            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-                            overflow: hidden;
-                        }
-
-                        .ai-container .btn-icon {
-                            display: none;
-                        }
-
-                        /* Interaction Logic: 
-                       When Input is Focused (Typing) -> Button shrinks to Icon
-                       However, user also said "Hover mouse cursor over it -> Enlarge"
-                    */
-
-                        /* State: Typing (Input Focus) -> Shrink Button */
-                        .ai-container:focus-within button {
-                            padding: 0 1rem;
-                            max-width: 50px;
-                            /* Shrink to icon size */
-                        }
-
-                        .ai-container:focus-within button .btn-text {
-                            display: none;
-                        }
-
-                        .ai-container:focus-within button .btn-icon {
-                            display: inline-block;
-                        }
-
-                        /* State: Hovering Button (Even while typing) -> Expand Button */
-                        .ai-container button:hover {
-                            transform: translateY(-2px);
-                            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
-                            padding: 0 1.5rem;
-                            max-width: 200px;
-                            /* Expand back */
-                        }
-
-                        .ai-container button:hover .btn-text {
-                            display: inline-block;
-                        }
-
-                        .ai-container button:hover .btn-icon {
-                            display: none;
-                        }
-
-                        #ai-loading {
-                            display: none;
-                            align-items: center;
-                            justify-content: center;
-                            background: rgba(255, 255, 255, 0.2);
-                            padding: 0 1.5rem;
-                            border-radius: 0.75rem;
-                        }
-
-                        @keyframes spin {
-                            from {
-                                transform: rotate(0deg);
-                            }
-
-                            to {
-                                transform: rotate(360deg);
-                            }
-                        }
-                    </style>
                 </section>
 
 
@@ -475,10 +288,24 @@
                                 <span class="category">{{ transaction.category }}</span>
                                 <span class="date">{{ transaction.date }}</span>
                             </div>
-                            <div class="amount">
-                                {{ "-" if transaction.type == "expense" else "+" }}{{
-                                "{:,.0f}".format(transaction.amount)
-                                }} ₫
+                            <div class="right-section">
+                                <div class="amount">
+                                    {{ "-" if transaction.type == "expense" else "+" }}{{
+                                    "{:,.0f}".format(transaction.amount)
+                                    }} ₫
+                                </div>
+                                <div class="actions">
+                                    <button class="edit-btn" data-id="{{ transaction.id }}"
+                                        data-amount="{{ transaction.amount }}"
+                                        data-category="{{ transaction.category }}" data-type="{{ transaction.type }}"
+                                        data-description="{{ transaction.description or '' }}"
+                                        data-date="{{ transaction.date }}">
+                                        <i class="fas fa-edit"></i> Edit
+                                    </button>
+                                    <button class="delete-btn" data-id="{{ transaction.id }}">
+                                        <i class="fas fa-trash"></i> Delete
+                                    </button>
+                                </div>
                             </div>
                         </li>
                         {% endfor %}
@@ -496,7 +323,7 @@
             </div>
             <div class="diary-container">
                 <input type="text" id="diary-title" placeholder="Note Title (Optional)"
-                    style="width: 100%; padding: 0.8rem; border-radius: 0.6rem; border: 1px solid #e5e7eb; font-family: inherit; font-size: 0.9rem; margin-bottom: 0.5rem; background: rgba(255,255,255,0.7); font-weight: 600;">
+                    style="width: 100%; padding: 0.8rem; border-radius: 0.75rem; border: 1px solid var(--glass-border); font-family: inherit; font-size: 0.95rem; margin-bottom: 0.5rem; background: rgba(255,255,255,0.8); font-weight: 600;">
                 <div class="diary-toolbar">
                     <button type="button" onclick="formatDoc('bold')" title="Bold"><b>B</b></button>
                     <button type="button" onclick="formatDoc('italic')" title="Italic"><i>I</i></button>
@@ -508,21 +335,24 @@
                 </div>
                 <div id="diary-content" class="rich-editor" contenteditable="true"
                     data-placeholder="Share your thoughts for today..."></div>
-                <button id="save-diary-btn"
-                    style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); margin-bottom: 1.5rem;">Save
+                <button id="save-diary-btn" style="background: var(--income); margin-bottom: 1.5rem;">Save
                     Note</button>
 
-                <div class="diary-history" style="border-top: 1px solid #eee; padding-top: 1.5rem;">
+                <div class="diary-history">
                     <h4
                         style="font-size: 0.85rem; color: #6b7280; margin-bottom: 0.8rem; display: flex; align-items: center; gap: 0.4rem;">
                         📅 Recent Notes
                     </h4>
-                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <div
+                        style="display: flex; flex-direction: column; gap: 0.5rem; flex: 1; min-height: 0; overflow: hidden;">
                         <input type="text" id="note-search" placeholder="Search notes (e.g. 2026-01)..."
                             style="width: 100%; padding: 0.5rem; font-size: 0.8rem; border-radius: 0.4rem; border: 1px solid #e5e7eb; margin-bottom: 0.5rem; background: rgba(255,255,255,0.8);">
-                        <div id="diary-history-list" style="display: flex; flex-direction: column; gap: 0.5rem;">
-                            <!-- History items will be injected here -->
-                            <p style="font-size: 0.75rem; color: #9ca3af; text-align: center;">No notes recorded yet</p>
+                        <div id="diary-history-list-container" class="scrollable-history">
+                            <div id="diary-history-list" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                                <!-- History items will be injected here -->
+                                <p style="font-size: 0.75rem; color: #9ca3af; text-align: center;">No notes recorded yet
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -599,9 +429,8 @@
                 <textarea id="bulk-text-input" placeholder="Example:
 12/1/2025: Spent 50k on lunch. 
 15/1/2025: Received salary 20m..."
-                    style="width: 100%; height: 300px; padding: 1rem; border: 1px solid #e2e8f0; border-radius: 0.75rem; font-family: 'Inter', sans-serif; font-size: 0.95rem; margin-bottom: 1rem; outline: none; transition: border-color 0.2s;"></textarea>
-                <button id="bulk-extract-btn"
-                    style="background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); font-weight: 700;">
+                    style="width: 100%; height: 300px; padding: 1rem; border: 1px solid #e2e8f0; border-radius: 0.75rem; font-family: 'IBM Plex Sans', sans-serif; font-size: 0.95rem; margin-bottom: 1rem; outline: none; transition: border-color 0.2s;"></textarea>
+                <button id="bulk-extract-btn" style="background: var(--accent); font-weight: 700;">
                     Scan Text with AI ✨
                 </button>
             </div>
@@ -647,6 +476,71 @@
             </div>
         </div>
     </div>
+    <!-- Asset Management Modal -->
+    <div id="asset-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeAssetModal()">&times;</span>
+            <div class="modal-header">
+                <h3 id="asset-modal-title">Add New Asset</h3>
+            </div>
+            <form id="asset-form">
+                <input type="hidden" id="asset-id">
+                <div class="form-group">
+                    <label for="asset-name">Asset Name</label>
+                    <input type="text" id="asset-name" required placeholder="e.g. Secret Stash" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label for="asset-type">Type</label>
+                    <select id="asset-type" required>
+                        <option value="Cash">Cash</option>
+                        <option value="Bank">Bank Account</option>
+                        <option value="Savings">Savings</option>
+                        <option value="Cumulative">Cumulative Fund</option>
+                        <option value="Stock">Stock / Investment</option>
+                        <option value="Crypto">Crypto</option>
+                        <option value="Real Estate">Real Estate</option>
+                        <option value="Gold">Gold</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="asset-amount">Current Balance</label>
+                    <input type="text" id="asset-amount" required placeholder="0" autocomplete="off">
+                </div>
+
+                <!-- Advanced Fields (Collapsible or just always visible for now) -->
+                <div style="margin-top: 1rem; border-top: 1px dashed #e5e7eb; padding-top: 1rem;">
+                    <h4 style="font-size: 0.9rem; margin-bottom: 0.5rem; color: var(--text-secondary);">Using for
+                        Savings/Investment?</h4>
+                    <div class="form-group">
+                        <label for="asset-interest">Interest Rate (%/year)</label>
+                        <input type="number" id="asset-interest" step="0.01" placeholder="0">
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group">
+                            <label for="asset-start-date">Start Date</label>
+                            <input type="date" id="asset-start-date">
+                        </div>
+                        <div class="form-group">
+                            <label for="asset-end-date">End Date</label>
+                            <input type="date" id="asset-end-date">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="asset-auto">Monthly Auto-Contribution</label>
+                        <input type="text" id="asset-auto" placeholder="0" autocomplete="off">
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+                    <button type="button" id="delete-asset-btn" onclick="deleteAsset()"
+                        style="background:var(--expense); display: none;">Delete</button>
+                    <button type="submit">Save Asset</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
 

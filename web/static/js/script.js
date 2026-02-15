@@ -77,6 +77,25 @@ document.addEventListener('DOMContentLoaded', () => {
         bulkConfirmBtn: document.getElementById('bulk-confirm-btn')
     };
 
+    // Event Delegation for Transaction List (Edit/Delete) - Replaces inline onclick
+    if (EL.transactionList) {
+        EL.transactionList.addEventListener('click', (e) => {
+            const editBtn = e.target.closest('.edit-btn');
+            if (editBtn) {
+                const d = editBtn.dataset;
+                window.editTransaction(d.id, d.amount, d.category, d.type, d.description, d.date);
+                return;
+            }
+
+            const deleteBtn = e.target.closest('.delete-btn');
+            if (deleteBtn) {
+                const id = deleteBtn.dataset.id;
+                window.deleteTransaction(id);
+                return;
+            }
+        });
+    }
+
     // Utility: Debounce function
     function debounce(func, wait) {
         let timeout;
@@ -346,6 +365,126 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.key === 'Enter') EL.aiBtn.click();
     });
 
+    // ========== VOICE INPUT FEATURE ==========
+    const voiceBtn = document.getElementById('voice-btn');
+    const voiceIcon = document.getElementById('voice-icon');
+    const voiceStatus = document.getElementById('voice-status');
+    const voiceStatusText = document.getElementById('voice-status-text');
+
+    let recognition = null;
+    let isListening = false;
+
+    // Check for Web Speech API support
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (SpeechRecognition && voiceBtn) {
+        recognition = new SpeechRecognition();
+        recognition.lang = 'vi-VN'; // Vietnamese
+        recognition.interimResults = true;
+        recognition.continuous = false;
+
+        recognition.onstart = () => {
+            isListening = true;
+            voiceIcon.textContent = '🔴';
+            voiceBtn.style.background = 'rgba(239, 68, 68, 0.5)';
+            voiceBtn.style.animation = 'pulse 1s infinite';
+            if (voiceStatus) {
+                voiceStatus.style.display = 'block';
+                voiceStatusText.textContent = '🎤 Đang lắng nghe...';
+            }
+        };
+
+        recognition.onresult = (event) => {
+            let interimTranscript = '';
+            let finalTranscript = '';
+
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                const transcript = event.results[i][0].transcript;
+                if (event.results[i].isFinal) {
+                    finalTranscript += transcript;
+                } else {
+                    interimTranscript += transcript;
+                }
+            }
+
+            // Show interim results
+            if (voiceStatusText) {
+                if (interimTranscript) {
+                    voiceStatusText.textContent = `🎧 "${interimTranscript}"`;
+                }
+            }
+
+            // When we have final result
+            if (finalTranscript) {
+                EL.aiInput.value = finalTranscript;
+                if (voiceStatusText) {
+                    voiceStatusText.textContent = `✅ Đã nghe: "${finalTranscript}"`;
+                }
+                // Auto-submit after a short delay
+                setTimeout(() => {
+                    EL.aiBtn.click();
+                    if (voiceStatus) voiceStatus.style.display = 'none';
+                }, 500);
+            }
+        };
+
+        recognition.onerror = (event) => {
+            console.error('Speech recognition error:', event.error);
+            isListening = false;
+            voiceIcon.textContent = '🎤';
+            voiceBtn.style.background = 'rgba(255,255,255,0.2)';
+            voiceBtn.style.animation = '';
+            if (voiceStatusText) {
+                let errorMsg = '❌ Lỗi nhận diện';
+                if (event.error === 'no-speech') errorMsg = '❌ Không nghe thấy gì';
+                else if (event.error === 'audio-capture') errorMsg = '❌ Không tìm thấy microphone';
+                else if (event.error === 'not-allowed') errorMsg = '❌ Vui lòng cho phép sử dụng microphone';
+                voiceStatusText.textContent = errorMsg;
+            }
+            setTimeout(() => {
+                if (voiceStatus) voiceStatus.style.display = 'none';
+            }, 3000);
+        };
+
+        recognition.onend = () => {
+            isListening = false;
+            voiceIcon.textContent = '🎤';
+            voiceBtn.style.background = 'rgba(255,255,255,0.2)';
+            voiceBtn.style.animation = '';
+        };
+
+        voiceBtn.addEventListener('click', () => {
+            if (isListening) {
+                recognition.stop();
+            } else {
+                try {
+                    recognition.start();
+                } catch (e) {
+                    console.error('Recognition error:', e);
+                }
+            }
+        });
+    } else if (voiceBtn) {
+        // Fallback: Browser doesn't support Web Speech API
+        voiceBtn.addEventListener('click', () => {
+            alert('Trình duyệt của bạn không hỗ trợ nhận diện giọng nói. Vui lòng sử dụng Chrome hoặc Edge.');
+        });
+    }
+
+    // Add pulse animation if not exists
+    if (!document.getElementById('voice-pulse-style')) {
+        const style = document.createElement('style');
+        style.id = 'voice-pulse-style';
+        style.textContent = `
+            @keyframes pulse {
+                0% { transform: scale(1); }
+                50% { transform: scale(1.1); }
+                100% { transform: scale(1); }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
     // Add Transaction
     EL.form.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -469,10 +608,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     const groupLabel = dateObj.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' });
 
                     // Add group header
+                    const noteCount = groups[groupKey].length;
                     const header = document.createElement('div');
                     header.className = 'note-group-header';
-                    header.textContent = groupLabel;
-                    EL.diaryHistoryList.appendChild(header);
+                    header.innerHTML = `
+                        <span>${groupLabel} <span style="opacity:0.5; font-weight:400;">(${noteCount})</span></span>
+                        <span class="toggle-icon">▼</span>
+                    `;
+
+                    // Container for this month's notes
+                    const groupContent = document.createElement('div');
+                    groupContent.className = 'note-group-content';
 
                     // Add items in this group
                     groups[groupKey].forEach(item => {
@@ -493,7 +639,19 @@ document.addEventListener('DOMContentLoaded', () => {
                             EL.diaryDate.value = date;
                             loadDiary(date);
                         };
-                        EL.diaryHistoryList.appendChild(btn);
+                        groupContent.appendChild(btn);
+                    });
+
+                    // Append header and content to wrapper
+                    const groupWrapper = document.createElement('div');
+                    groupWrapper.className = 'note-group-wrapper';
+                    groupWrapper.appendChild(header);
+                    groupWrapper.appendChild(groupContent);
+                    EL.diaryHistoryList.appendChild(groupWrapper);
+
+                    // Add toggle event
+                    header.addEventListener('click', () => {
+                        groupWrapper.classList.toggle('collapsed');
                     });
                 });
             } else {
@@ -637,8 +795,12 @@ document.addEventListener('DOMContentLoaded', () => {
                                     ${t.type === 'expense' ? '-' : '+'}${Number(t.amount || 0).toLocaleString('vi-VN')} ₫
                                 </div>
                                 <div class="actions">
-                                    <button class="edit-btn" onclick="editTransaction(${t.id}, ${t.amount}, '${t.category}', '${t.type}', '${t.description}', '${t.date}')">Edit</button>
-                                    <button class="delete-btn" onclick="deleteTransaction(${t.id})">Delete</button>
+                                    <button class="edit-btn" onclick="editTransaction(${t.id}, ${t.amount}, '${t.category}', '${t.type}', '${t.description}', '${t.date}')">
+                                        <i class="fas fa-edit"></i> Edit
+                                    </button>
+                                    <button class="delete-btn" onclick="deleteTransaction(${t.id})">
+                                        <i class="fas fa-trash"></i> Delete
+                                    </button>
                                 </div>
                             </div>
                         `;
@@ -1091,6 +1253,25 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchBudgetStatus();
 
     // ========== ASSETS & SAVINGS LOGIC ==========
+    const assetColors = {
+        'Cash': 'bg-gradient-to-r from-green-400 to-green-500', // emerald
+        'Bank': 'bg-gradient-to-r from-blue-400 to-blue-500', // blue
+        'Savings': 'bg-gradient-to-r from-purple-400 to-purple-500', // purple
+        'Stock': 'bg-gradient-to-r from-red-400 to-red-500', // red
+        'Crypto': 'bg-gradient-to-r from-yellow-400 to-yellow-500', // yellow
+        'Real Estate': 'bg-gradient-to-r from-indigo-400 to-indigo-500', // indigo
+        'Gold': 'bg-gradient-to-r from-yellow-300 to-yellow-400', // gold
+        'Other': 'bg-gradient-to-r from-gray-400 to-gray-500' // gray
+    };
+
+    function getAssetIcon(type) {
+        const icons = {
+            'Cash': '💵', 'Bank': '🏦', 'Savings': '🐖', 'Cumulative': '📈',
+            'Stock': '📉', 'Crypto': '₿', 'Real Estate': '🏠', 'Gold': '🥇', 'Other': '📦'
+        };
+        return icons[type] || '💰';
+    }
+
     async function fetchAssets(month = null) {
         if (!EL.assetsLoading || !EL.assetsContent) return;
 
@@ -1102,163 +1283,228 @@ document.addEventListener('DOMContentLoaded', () => {
             EL.assetsLoading.style.display = 'none';
             EL.assetsContent.style.display = 'block';
 
-            let cash = 0;
-            let bank = 0;
-            const savings = [];
+            const liquidContainer = document.getElementById('liquid-assets-list');
+            const savingsContainer = document.getElementById('savings-assets-list');
+
+            if (liquidContainer) liquidContainer.innerHTML = '';
+            if (savingsContainer) savingsContainer.innerHTML = '';
+
+            // Separate Assets
+            const liquidTypes = ['Cash', 'Bank', 'Other'];
+            // Everything else goes to Savings/Investments unless explicitly specified?
+            // Let's stick to the user's implicit logic: Cash/Bank/Other -> Liquid.
+            // Savings/Cumulative/Stock/Crypto/RealEstate/Gold -> Savings.
 
             assets.forEach(a => {
-                if (a.type === 'Cash') cash += a.amount;
-                else if (a.type === 'Bank') bank += a.amount;
-                else if (a.type === 'Savings' || a.type === 'Cumulative') savings.push(a);
+                const isLiquid = liquidTypes.includes(a.type);
+                const container = isLiquid ? liquidContainer : savingsContainer;
+                if (!container) return;
+
+                const card = document.createElement('div');
+                card.className = 'asset-card';
+
+                // Calculate Savings Info if applicable
+                let footerInfo = '';
+                let progressBar = '';
+                let extraValue = '';
+
+                if (!isLiquid) {
+                    // Savings Logic
+                    let matureDateObj = null;
+                    let startDateObj = a.start_date ? new Date(a.start_date) : new Date();
+                    const now = new Date();
+
+                    if (a.end_date) {
+                        matureDateObj = new Date(a.end_date);
+                    } else if (a.term_months) {
+                        matureDateObj = new Date(startDateObj);
+                        matureDateObj.setMonth(matureDateObj.getMonth() + a.term_months);
+                    }
+
+                    // Interest Calc
+                    let expectedInterest = 0;
+                    if (a.term_months && a.interest_rate) {
+                        expectedInterest = a.amount * (a.interest_rate / 100) * (a.term_months / 12);
+                    } else if (a.type === 'Cumulative' && matureDateObj) {
+                        // Cumulative approx
+                        const diffTime = Math.abs(matureDateObj - startDateObj);
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                        const months = Math.floor(diffDays / 30);
+                        const totalPrincipal = a.amount + (a.auto_contribution || 0) * months;
+                        const avgBalance = (a.amount + totalPrincipal) / 2;
+                        const years = diffDays / 365.0;
+                        expectedInterest = avgBalance * (a.interest_rate / 100) * years;
+                    } else if (matureDateObj) {
+                        // Simple annual
+                        const diffTime = Math.abs(matureDateObj - startDateObj);
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                        const years = diffDays / 365.0;
+                        expectedInterest = a.amount * (a.interest_rate / 100) * years;
+                    }
+
+                    if (matureDateObj) {
+                        const totalDuration = matureDateObj.getTime() - startDateObj.getTime();
+                        const elapsed = now.getTime() - startDateObj.getTime();
+                        const progress = Math.min(100, Math.max(0, (elapsed / totalDuration) * 100));
+
+                        progressBar = `
+                            <div style="position: absolute; bottom: 0; left: 0; h-1; width: 100%; background: rgba(255,255,255,0.1);">
+                                <div style="height: 3px; background: #34d399; width: ${progress}%;"></div>
+                            </div>
+                        `;
+                        footerInfo = `<div style="font-size: 0.75rem; opacity: 0.7; margin-top: 0.5rem;">Ends: ${matureDateObj.toLocaleDateString('vi-VN')}</div>`;
+                    }
+
+                    if (expectedInterest > 0) {
+                        extraValue = `<div style="font-size: 0.8rem; color: #6ee7b7; font-weight: 600;">+${formatVND(expectedInterest.toFixed(0))}</div>`;
+                    }
+                }
+
+                card.innerHTML = `
+                    <div class="asset-actions">
+                        <button class="asset-action-btn" onclick='editAsset(${JSON.stringify(a).replace(/'/g, "&#39;")})' title="Edit">
+                            <i class="fas fa-pen"></i>
+                        </button>
+                    </div>
+                    <div class="asset-type">${getAssetIcon(a.type)} ${a.type}</div>
+                    <div class="asset-name">${a.name}</div>
+                    <div class="asset-amount">${formatVND(a.amount)} ₫</div>
+                    ${extraValue}
+                    ${footerInfo}
+                    ${progressBar}
+                `;
+                container.appendChild(card);
             });
 
             // Populate Payment Source Dropdown (Liquid only)
             if (EL.assetSelect) {
-                // Clear existing options except default "None"
-                while (EL.assetSelect.options.length > 1) {
-                    EL.assetSelect.remove(1);
-                }
+                // Keep "None"
+                while (EL.assetSelect.options.length > 1) EL.assetSelect.remove(1);
 
-                assets.forEach(a => {
-                    if (a.type === 'Cash' || a.type === 'Bank') {
-                        const opt = document.createElement('option');
-                        opt.value = a.id;
-                        opt.textContent = `${a.name} (${formatVND(a.amount)})`;
-                        EL.assetSelect.appendChild(opt);
-                    }
+                assets.filter(a => liquidTypes.includes(a.type)).forEach(a => {
+                    const opt = document.createElement('option');
+                    opt.value = a.id;
+                    opt.textContent = `${a.name} (${formatVND(a.amount)})`;
+                    EL.assetSelect.appendChild(opt);
                 });
             }
 
-            // Update Liquid Cards
-            if (EL.assetCash) EL.assetCash.textContent = formatVND(cash) + ' ₫';
-            if (EL.assetBank) EL.assetBank.textContent = formatVND(bank) + ' ₫';
-
-            // Render Savings List with Calculations
-            if (EL.savingsList) {
-                EL.savingsList.innerHTML = '';
-            } else {
-                return;
-            }
-
-            savings.forEach(s => {
-                // Calculate Interest
-                // Formula: Principal * Rate% * Days / 365
-                // Or simplified: Principal * Rate% * Months / 12
-
-                let matureDateObj = null;
-                let startDateObj = s.start_date ? new Date(s.start_date) : new Date(); // Fallback if missing
-                const now = new Date();
-
-                if (s.end_date) {
-                    matureDateObj = new Date(s.end_date);
-                } else if (s.term_months) {
-                    // Start date + months
-                    // We need a stable start date. For the user's specific items we seeded 2024-01-30.
-                    matureDateObj = new Date(startDateObj);
-                    matureDateObj.setMonth(matureDateObj.getMonth() + s.term_months);
-                }
-
-                // If we know maturity, we can calculate expected full return
-                let expectedInterest = 0;
-                let progress = 0;
-
-                // Interest Calculation Logic based on Term or Date
-                if (s.term_months && s.interest_rate) {
-                    // Term Deposit: Interest = Principal * Rate% * (Months/12)
-                    expectedInterest = s.amount * (s.interest_rate / 100) * (s.term_months / 12);
-                } else if (s.type === 'Cumulative') {
-                    // Cumulative Fund logic: 
-                    // Principal increases by 'auto_contribution' monthly.
-                    // Total invested = StartAmount + Monthly * Months
-
-                    if (matureDateObj && startDateObj) {
-                        const diffTime = Math.abs(matureDateObj - startDateObj);
-                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                        const months = Math.floor(diffDays / 30); // Approx
-
-                        // Approx total principal at end
-                        const totalPrincipal = s.amount + (s.auto_contribution || 0) * months;
-                        const avgBalance = (s.amount + totalPrincipal) / 2;
-                        const years = diffDays / 365.0;
-                        expectedInterest = avgBalance * (s.interest_rate / 100) * years;
-                    }
-                } else if (matureDateObj && startDateObj) {
-                    // Date diff based: Interest = Principal * Rate% * (Years)
-                    const diffTime = Math.abs(matureDateObj - startDateObj);
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                    const years = diffDays / 365.0;
-                    expectedInterest = s.amount * (s.interest_rate / 100) * years;
-                }
-
-                if (matureDateObj) {
-                    // Progress Bar
-                    const totalDuration = matureDateObj.getTime() - startDateObj.getTime();
-                    const elapsed = now.getTime() - startDateObj.getTime();
-                    // Clamp 0-100
-                    progress = Math.min(100, Math.max(0, (elapsed / totalDuration) * 100));
-                }
-
-                const finalValue = s.amount + expectedInterest;
-
-                // Create Card
-                const item = document.createElement('div');
-                item.style.cssText = `
-                    background: rgba(255,255,255,0.1); 
-                    padding: 1rem; 
-                    border-radius: 0.75rem; 
-                    border: 1px solid rgba(255,255,255,0.2);
-                    position: relative;
-                    overflow: hidden;
-                `;
-
-                // Progress Bar Background Layer
-                const progressBar = document.createElement('div');
-                progressBar.style.cssText = `
-                    position: absolute;
-                    bottom: 0;
-                    left: 0;
-                    height: 4px;
-                    background: #34d399; /* Emerald 400 */
-                    width: ${progress}%;
-                    transition: width 1s ease-in-out;
-                    opacity: 0.8;
-                `;
-
-                item.innerHTML = `
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem; position: relative; z-index: 1;">
-                        <div>
-                            <div style="font-size: 0.95rem; font-weight: 700;">${s.name}</div>
-                            <div style="font-size: 0.75rem; opacity: 0.7;">
-                                Ends: ${matureDateObj ? matureDateObj.toLocaleDateString('vi-VN') : 'Unknown'} 
-                                (${progress.toFixed(0)}% elapsed)
-                            </div>
-                        </div>
-                        <div style="background: rgba(52, 211, 153, 0.2); color: #6ee7b7; padding: 0.2rem 0.6rem; border-radius: 1rem; font-size: 0.75rem; font-weight: 600;">
-                            ${s.interest_rate}% / year
-                        </div>
-                    </div>
-                    
-                    <div style="display: flex; justify-content: space-between; align-items: flex-end; position: relative; z-index: 1;">
-                        <div>
-                            <div style="font-size: 0.75rem; opacity: 0.8; margin-bottom: 0.1rem;">Dep. Amount</div>
-                            <div style="font-size: 1.1rem; font-weight: 600;">${formatVND(s.amount)} ₫</div>
-                        </div>
-                        <div style="text-align: right;">
-                             <div style="font-size: 0.75rem; opacity: 0.8; margin-bottom: 0.1rem;">Est. Profit</div>
-                             <div style="font-size: 1.1rem; font-weight: 600; color: #6ee7b7;">+${formatVND(expectedInterest.toFixed(0))} ₫</div>
-                        </div>
-                    </div>
-                `;
-
-                item.appendChild(progressBar);
-                EL.savingsList.appendChild(item);
-            });
-
         } catch (e) {
             console.error('Error fetching assets:', e);
-            if (loading) loading.textContent = 'Failed to load assets.';
+            if (EL.assetsLoading) EL.assetsLoading.textContent = 'Failed to load assets.';
         }
     }
+
+    // Asset Management
+    window.openAssetModal = () => {
+        const modal = document.getElementById('asset-modal');
+        const form = document.getElementById('asset-form');
+        document.getElementById('asset-modal-title').textContent = "Add New Asset";
+        if (modal) {
+            modal.style.display = 'block';
+            form.reset();
+            document.getElementById('asset-id').value = '';
+            document.getElementById('delete-asset-btn').style.display = 'none';
+        }
+    };
+
+    window.closeAssetModal = () => {
+        const modal = document.getElementById('asset-modal');
+        if (modal) modal.style.display = 'none';
+    };
+
+    window.editAsset = (asset) => {
+        const modal = document.getElementById('asset-modal');
+        if (modal) {
+            modal.style.display = 'block';
+            document.getElementById('asset-modal-title').textContent = "Edit Asset";
+            document.getElementById('asset-id').value = asset.id;
+            document.getElementById('asset-name').value = asset.name;
+            document.getElementById('asset-type').value = asset.type;
+
+            // Format amount
+            document.getElementById('asset-amount').value = formatVND(asset.amount);
+
+            document.getElementById('asset-interest').value = asset.interest_rate || '';
+            document.getElementById('asset-start-date').value = asset.start_date || '';
+            document.getElementById('asset-end-date').value = asset.end_date || '';
+            document.getElementById('asset-auto').value = asset.auto_contribution ? formatVND(asset.auto_contribution) : '';
+
+            document.getElementById('delete-asset-btn').style.display = 'block';
+        }
+    };
+
+    window.deleteAsset = async () => {
+        const id = document.getElementById('asset-id').value;
+        if (!id) return;
+        if (!confirm('Are you sure? Transactions linked to this asset will stay but become unlinked.')) return;
+
+        try {
+            const res = await fetch(`/api/assets/${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                closeAssetModal();
+                fetchAssets();
+            } else {
+                alert('Failed to delete asset');
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Error deleting asset');
+        }
+    };
+
+    // Form Submit
+    document.getElementById('asset-form')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const id = document.getElementById('asset-id').value;
+        const amountInput = document.getElementById('asset-amount');
+        const autoInput = document.getElementById('asset-auto');
+
+        const data = {
+            name: document.getElementById('asset-name').value,
+            type: document.getElementById('asset-type').value,
+            amount: getFullAmount(amountInput),
+            interest_rate: parseFloat(document.getElementById('asset-interest').value) || 0,
+            start_date: document.getElementById('asset-start-date').value || null,
+            end_date: document.getElementById('asset-end-date').value || null,
+            auto_contribution: getFullAmount(autoInput)
+        };
+
+        const url = id ? `/api/assets/${id}` : '/api/assets';
+        const method = id ? 'PUT' : 'POST';
+
+        try {
+            const res = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await res.json();
+
+            if (result.success || res.ok) {
+                closeAssetModal();
+                fetchAssets();
+            } else {
+                alert(result.error || 'Failed to save asset');
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Error saving asset');
+        }
+    });
+
+    // Formatting listeners for new inputs
+    const assetAmount = document.getElementById('asset-amount');
+    const assetAuto = document.getElementById('asset-auto');
+    if (assetAmount) setupSmartInput(assetAmount);
+    if (assetAuto) setupSmartInput(assetAuto);
+
+    // Initial Fetch (Assets) logic is called inside fetchData usually, or separately?
+    // Let's check fetchData.
+    // fetchData is called on load? No, line 1673 ends the block.
+    // We need to make sure fetchAssets is called on load.
+    fetchAssets();
 
     // --- Bulk AI Import Logic ---
 
@@ -1472,7 +1718,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 <input type="checkbox" id="${checkboxId}" onchange="this.parentElement.classList.toggle('completed', this.checked); if(this.checked) this.setAttribute('checked', ''); else this.removeAttribute('checked');">
                 <span class="checklist-text" contenteditable="true" style="margin-left: 5px;">New task</span>
             </div>
-            <div><br></div>
         `;
 
         document.execCommand('insertHTML', false, checklistHtml);
@@ -1498,16 +1743,32 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Handle Enter key in checklist text to create new item
+    // Handle keys in checklist
     EL.diaryContent?.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            const selection = window.getSelection();
-            const anchorNode = selection.anchorNode;
-            const checklistText = anchorNode?.parentElement?.closest('.checklist-text');
+        const selection = window.getSelection();
+        const anchorNode = selection.anchorNode;
+        const checklistText = anchorNode?.parentElement?.closest('.checklist-text') ||
+            (anchorNode?.classList?.contains('checklist-text') ? anchorNode : null);
 
-            if (checklistText) {
-                e.preventDefault();
-                addChecklist();
+        if (e.key === 'Enter' && checklistText) {
+            e.preventDefault();
+            addChecklist();
+        }
+
+        if (e.key === 'Backspace' && checklistText) {
+            // If the checklist item is empty or the cursor is at the start, delete the whole block
+            if (checklistText.textContent.trim() === '' || (selection.anchorOffset === 0)) {
+                const item = checklistText.closest('.checklist-item');
+                if (item) {
+                    e.preventDefault();
+                    // Move cursor to before the item before removing it
+                    const prevSibling = item.previousElementSibling;
+                    item.remove();
+
+                    // If there was a trailing <br> (empty div) from addChecklist, remove it too if next
+                    // But for simplicity, we just focus back on the editor
+                    EL.diaryContent.focus();
+                }
             }
         }
     });

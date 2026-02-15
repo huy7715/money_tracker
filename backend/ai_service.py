@@ -80,24 +80,39 @@ class AIService:
 
         INSTRUCTIONS:
         - For Vietnamese currency, strictly handle these suffixes:
-          * "ngàn", "nghìn", "k" -> multiply by 1,000 (e.g., "3 ngàn" -> 3000)
-          * "triệu", "tr", "m" -> multiply by 1,000,000 (e.g., "3 triệu" -> 3000000)
-          * "tỷ" -> multiply by 1,000,000,000 (e.g., "3 tỷ" -> 3000000000)
-          * "rưỡi" -> adds half of the preceding unit (e.g., "3 triệu rưỡi" -> 3500000)
+          * "ngàn", "nghìn", "ngan", "nghin" -> multiply by 1,000
+          * "k" (standalone or after number) -> multiply by 1,000
+          * "triệu", "trieu", "tr" (standalone) -> multiply by 1,000,000
+          * "m" (standalone, not in word) -> multiply by 1,000,000
+          * "tỷ", "ty" -> multiply by 1,000,000,000
+          * "rưỡi", "ruoi" -> adds EXACTLY HALF of the preceding unit value
+        
+        - CRITICAL: "rưỡi" calculation examples:
+          * "3 triệu rưỡi" = 3,000,000 + (1,000,000 / 2) = 3,500,000
+          * "500 ngàn rưỡi" = 500,000 + (1,000 / 2 * 500) = 750,000
+          * "2 tỷ rưỡi" = 2,000,000,000 + 1,000,000,000 = 3,000,000,000
+        
         - Payment Source Detection:
           * If user mentions "tiền mặt", "cash", "ví" -> set payment_source to "Cash"
           * If user mentions "chuyển khoản", "ck", "bank", "ngân hàng", "thẻ", "card" -> set payment_source to "Bank"
+        
         - For budget adjustments:
           * If user says "tăng thêm", "thêm vào", "cộng thêm", "increase", "add" -> set adjustment to "increase"
           * If user says "giảm bớt", "giảm đi", "bớt đi", "decrease", "reduce" -> set adjustment to "decrease"
           * If user says "giảm xuống còn", "chỉ còn", "set thành", "tăng lên mức", "đổi thành" -> set adjustment to null
-        - Examples:
+        
+        - EXAMPLES (FOLLOW THESE EXACTLY):
           * "35 triệu" -> 35000000
+          * "500k" -> 500000 (k means x1000)
+          * "2tr" -> 2000000 (tr means triệu)
+          * "3 triệu rưỡi" -> 3500000 (3m + 0.5m)
+          * "cafe 30k" -> amount: 30000, category: Food, description: "cafe"
           * "tăng thêm 500k cho food" -> amount: 500000, category: Food, adjustment: "increase"
           * "giảm 200 ngàn budget shopping" -> amount: 200000, category: Shopping, adjustment: "decrease"
           * "giảm food xuống còn 1 triệu" -> amount: 1000000, category: Food, adjustment: null
           * "ăn tối 500k tiền mặt" -> amount: 500000, category: Food, type: expense, payment_source: "Cash"
           * "chuyển khoản 2tr tiền nhà" -> amount: 2000000, category: Rent, type: expense, payment_source: "Bank"
+        
         - Return the full numeric value as a number.
         - For transactions, if relative dates (tomorrow, etc.) are used, calculate the exact date.
         - For budgets, if no month is specified, use the Current Month.

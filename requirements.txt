@@ -3,3 +3,5 @@ google-generativeai
 openai
 python-dotenv
 gunicorn
+flask-socketio
+python-telegram-bot

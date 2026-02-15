@@ -1,12 +1,15 @@
 :root {
     --primary: #4f46e5;
     --primary-hover: #4338ca;
+    --accent: #6366f1;
+    --accent-hover: #4f46e5;
     --bg-color: #f3f4f6;
-    --card-bg: #ffffff;
+    --card-bg: rgba(255, 255, 255, 0.75);
     --text-primary: #1f2937;
     --text-secondary: #6b7280;
     --income: #10b981;
     --expense: #ef4444;
+    --glass-border: rgba(255, 255, 255, 0.4);
 }
 
 * {
@@ -16,9 +19,8 @@
 }
 
 body {
-    font-family: 'Inter', sans-serif;
+    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
-    /* Default subtle gradient */
     background-size: cover;
     background-attachment: fixed;
     background-position: center;
@@ -60,22 +62,43 @@ body {
 .sidebar {
     position: sticky;
     top: 2rem;
-    height: fit-content;
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(15px);
-    border: 1px solid rgba(255, 255, 255, 0.4);
+    display: flex;
+    flex-direction: column;
+    background: var(--card-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--glass-border);
     border-radius: 1.25rem;
     padding: 1.5rem;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.03);
     opacity: 0;
     animation: slideUp 0.5s ease-out forwards;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Left sidebar: shrink to fit content, no blank space */
+.left-sidebar {
+    height: fit-content;
+    overflow: visible;
+}
+
+/* Right sidebar: allow scrolling, hide scrollbar visually */
+.right-sidebar {
+    max-height: calc(100vh - 4rem);
+    overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.right-sidebar::-webkit-scrollbar {
+    display: none;
 }
 
 .sidebar-header h3 {
     margin-bottom: 1.5rem;
     font-size: 1.1rem;
     color: var(--text-primary);
-    border-bottom: 2px solid var(--primary);
+    border-bottom: 2px solid var(--accent);
     padding-bottom: 0.5rem;
     display: inline-block;
 }
@@ -88,7 +111,14 @@ body {
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
-    border: 1px solid #f3f4f6;
+    border: 1px solid var(--glass-border);
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.stat-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 .stat-item span {
@@ -111,14 +141,15 @@ body {
     color: var(--text-primary);
     font-size: 0.9rem;
     font-weight: 500;
-    transition: all 0.2s;
-    border: 1px solid #f3f4f6;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid var(--glass-border);
 }
 
 .sidebar-link:hover {
     background: var(--primary);
     color: white;
     transform: translateX(5px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .container {
@@ -168,39 +199,40 @@ h1 {
 .balance-card {
     background: linear-gradient(135deg, var(--primary), var(--primary-hover));
     color: white;
-    padding: 2rem;
-    border-radius: 1rem;
-    box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.4);
-    /* Enhanced shadow */
+    padding: 2.5rem 2rem;
+    border-radius: 1.25rem;
+    box-shadow: 0 20px 40px -10px rgba(79, 70, 229, 0.3);
     text-align: center;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transition: transform 0.3s ease;
+}
+
+.balance-card:hover {
+    transform: scale(1.02);
 }
 
 .balance-card h2 {
     font-size: 0.875rem;
     font-weight: 500;
-    opacity: 0.9;
+    opacity: 0.8;
     margin-bottom: 0.5rem;
 }
 
 .balance-card .amount {
-    font-size: 2.5rem;
+    font-size: 3rem;
     font-weight: 700;
+    letter-spacing: -0.02em;
 }
 
 section {
-    background: rgba(255, 255, 255, 0.8);
-    /* Semi-transparent */
-    backdrop-filter: blur(12px);
-    /* Glass blur */
-    -webkit-backdrop-filter: blur(12px);
-    padding: 1.5rem;
-    border-radius: 1rem;
-    margin-bottom: 1.5rem;
-    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
-    /* Soft glass shadow */
-    border: 1px solid rgba(255, 255, 255, 0.4);
-    /* Subtle border for definition */
+    background: var(--card-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    padding: 2rem;
+    border-radius: 1.25rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.05);
+    border: 1px solid var(--glass-border);
     opacity: 0;
     animation: slideUp 0.5s ease-out forwards;
 }
@@ -258,15 +290,25 @@ button {
     color: white;
     padding: 0.75rem;
     border: none;
-    border-radius: 0.5rem;
+    border-radius: 0.75rem;
     font-size: 1rem;
-    font-weight: 500;
+    font-weight: 600;
     cursor: pointer;
-    transition: background-color 0.15s ease;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
 }
 
 button:hover {
     background-color: var(--primary-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+button:active {
+    transform: translateY(0);
 }
 
 #transaction-list {
@@ -277,8 +319,15 @@ button:hover {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1rem 0;
-    border-bottom: 1px solid #f3f4f6;
+    padding: 1.25rem 0.75rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    transition: background-color 0.2s ease;
+    border-radius: 0.75rem;
+    margin-bottom: 0.25rem;
+}
+
+.transaction-item:hover {
+    background-color: rgba(0, 0, 0, 0.02);
 }
 
 .transaction-item:last-child {
@@ -307,14 +356,21 @@ button:hover {
 .transaction-item .right-section {
     display: flex;
     align-items: center;
+    gap: 1.5rem;
+}
+
+.actions {
+    display: flex;
+    gap: 0.5rem;
 }
 
 .actions button {
-    padding: 0.25rem 0.5rem;
+    padding: 0.4rem 0.75rem;
     font-size: 0.75rem;
-    margin-left: 0.5rem;
     width: auto;
-    border-radius: 0.25rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    white-space: nowrap;
 }
 
 .edit-btn {
@@ -446,31 +502,70 @@ button:hover {
     margin: 1.25rem 0 0.5rem 0.2rem;
     padding-bottom: 0.25rem;
     border-bottom: 1px dashed rgba(79, 70, 229, 0.2);
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+    transition: color 0.2s;
+}
+
+.note-group-header:hover {
+    color: var(--accent);
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: 4px;
+    padding-left: 4px;
+    padding-right: 4px;
+}
+
+.toggle-icon {
+    font-size: 0.7rem;
+    transition: transform 0.3s ease;
+}
+
+.note-group-wrapper.collapsed .toggle-icon {
+    transform: rotate(-90deg);
+}
+
+.note-group-content {
+    overflow: hidden;
+    transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+    max-height: 1000px;
+    /* Arbitrary large height */
+    opacity: 1;
+}
+
+.note-group-wrapper.collapsed .note-group-content {
+    max-height: 0;
+    opacity: 0;
+    margin: 0;
 }
 
 .note-item {
     background: white !important;
     border: 1px solid #e5e7eb !important;
-    padding: 0.75rem !important;
+    border-left: 3px solid var(--primary) !important;
+    padding: 0.7rem 0.85rem !important;
     border-radius: 0.6rem !important;
-    font-size: 0.875rem !important;
+    font-size: 0.82rem !important;
     cursor: pointer;
     text-align: left;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     color: #374151 !important;
     font-weight: 500 !important;
     display: flex !important;
     justify-content: space-between !important;
     align-items: center !important;
     width: 100%;
-    margin-bottom: 0.4rem;
+    margin-bottom: 0.35rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .note-item:hover {
-    transform: translateX(4px);
+    transform: translateX(3px);
     border-color: var(--primary) !important;
-    background: #f8fafc !important;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%) !important;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.12);
 }
 
 .note-item .day-chip {
@@ -534,8 +629,10 @@ button:hover {
 
 .rich-editor {
     width: 100%;
-    min-height: 300px;
-    max-height: 400px;
+    min-height: 200px;
+    /* Reduced slightly to ensure history is always visible */
+    max-height: 30vh;
+    /* Dynamic max height based on screen size */
     padding: 1rem;
     border-radius: 0 0 0.8rem 0.8rem;
     border: 1px solid #e5e7eb;
@@ -545,6 +642,8 @@ button:hover {
     background: rgba(255, 255, 255, 0.5);
     overflow-y: auto;
     outline: none;
+    flex-shrink: 0;
+    /* Prevent editor from collapsing completely */
 }
 
 .rich-editor:focus {
@@ -697,10 +796,486 @@ button:hover {
         min-height: 200px;
     }
 
+    /* Asset Management Styles */
+}
+
+.asset-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.75rem;
+}
+
+.asset-card {
+    background: rgba(255, 255, 255, 0.15);
+    padding: 1rem;
+    border-radius: 0.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.asset-card:hover {
+    background: rgba(255, 255, 255, 0.25);
+    transform: translateY(-2px);
+}
+
+.asset-card .asset-type {
+    font-size: 0.8rem;
+    opacity: 0.8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.25rem;
+}
+
+.asset-card .asset-amount {
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+.asset-card .asset-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 0.1rem;
+}
+
+.asset-actions {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    display: none;
+    gap: 0.25rem;
+}
+
+.asset-card:hover .asset-actions {
+    display: flex;
+}
+
+.asset-action-btn {
+    background: rgba(255, 255, 255, 0.9);
+    border: none;
+    border-radius: 0.25rem;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    cursor: pointer;
+    color: #4b5563;
+    transition: all 0.2s;
+    padding: 0;
+}
+
+.asset-action-btn:hover {
+    background: white;
+    color: var(--primary);
+    transform: scale(1.1);
+}
+
+.asset-action-btn.delete:hover {
+    color: var(--expense);
+}
+
+/* Floating Action Button */
+.fab {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.9rem;
+    padding: 0;
+}
+
+.fab:hover {
+    background: rgba(255, 255, 255, 0.4);
+    transform: scale(1.1);
+}
+
+/* Modal Enhancements */
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 1rem;
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+}
+
+/* Section Header Utility */
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.section-title {
+    margin: 0;
+    font-size: 1.125rem;
+    font-weight: 600;
+}
+
+/* Gradient Backgrounds */
+.bg-gradient-green {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+}
+
+.bg-gradient-blue {
+    background: linear-gradient(135deg, #0e7490 0%, #0891b2 100%);
+    color: white;
+}
+
+.bg-gradient-purple {
+    background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+    color: white;
+}
+
+/* Animation Delays */
+.delay-100 {
+    animation-delay: 0.1s;
+}
+
+.delay-200 {
+    animation-delay: 0.2s;
+}
+
+.delay-300 {
+    animation-delay: 0.3s;
+}
+
+.delay-400 {
+    animation-delay: 0.4s;
+}
+
+.delay-500 {
+    animation-delay: 0.5s;
+}
+
+.delay-600 {
+    animation-delay: 0.6s;
+}
+
+/* Utility Classes replacing inline styles */
+.text-white {
+    color: white !important;
+}
+
+.text-white-90 {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.shadow-lg {
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+.rounded-xl {
+    border-radius: 1.25rem;
+}
+
+.mb-6 {
+    margin-bottom: 1.5rem;
+}
+
+.p-6 {
+    padding: 1.5rem;
+}
+
+.flex-between-center {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Backup Button */
+.backup-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: #f3f4f6;
+    color: #4b5563;
+    border-radius: 0.5rem;
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: all 0.2s;
+    border: 1px solid #e5e7eb;
+}
+
+.backup-btn:hover {
+    background: #e5e7eb;
+    color: #1f2937;
+}
+
+@media (max-width: 768px) {
+
     /* Modal full width */
     .modal-content {
         width: 95%;
         margin: 1rem;
         padding: 1.5rem;
+        max-width: none;
+    }
+
+    /* Scrollable Journal History — scrollbar hidden for clean look */
+    .scrollable-history {
+        max-height: 200px;
+        overflow-y: auto;
+        padding-right: 0.25rem;
+        scrollbar-width: thin;
+    }
+}
+
+/* This closing brace is added based on the instruction for a missing media query brace */
+
+.scrollable-history {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 2px;
+    padding-bottom: 2rem;
+    box-sizing: border-box;
+    scrollbar-width: none;
+    /* Firefox */
+    -ms-overflow-style: none;
+    /* IE/Edge */
+}
+
+.scrollable-history::-webkit-scrollbar {
+    display: none;
+    /* Chrome/Safari */
+}
+
+.diary-history {
+    position: relative;
+    border-top: 1px solid #eee;
+    padding-top: 1.5rem;
+}
+
+/* =========================================
+   Moved from index.html (Internal Styles)
+   ========================================= */
+
+/* Section Styles */
+.chart-section {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 1rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    animation-delay: 0.2s;
+}
+
+.budget-manager-section {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    padding: 1.5rem;
+    border-radius: 1.25rem;
+    margin-bottom: 1.5rem;
+    color: white;
+    box-shadow: 0 10px 20px rgba(16, 185, 129, 0.2);
+    animation-delay: 0.3s;
+}
+
+.ai-assistant-section {
+    background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+    padding: 1.5rem;
+    border-radius: 1.25rem;
+    margin-bottom: 1.5rem;
+    color: white;
+    box-shadow: 0 10px 20px rgba(99, 102, 241, 0.2);
+    animation-delay: 0.5s;
+}
+
+/* Dynamic Budget Form Animations */
+.budget-input-group:focus-within {
+    /* Sliding effect: shrink category, expand input, shrink button */
+    grid-template-columns: 100px 1.5fr 60px;
+}
+
+.budget-input-group:focus-within .budget-select {
+    font-size: 0.85rem;
+    opacity: 0.8;
+}
+
+.budget-input-group:focus-within .budget-input {
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.3);
+    font-size: 1.1rem;
+}
+
+.budget-input-group:focus-within .budget-btn {
+    padding: 0;
+    border-radius: 12px;
+    width: 50px;
+    height: 50px;
+    margin-left: auto;
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.2);
+    animation: pulse-green 2s infinite;
+}
+
+@keyframes pulse-green {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+/* State Management for Button Content */
+.budget-btn .btn-icon {
+    display: none;
+    font-size: 1.5rem;
+}
+
+.budget-input-group:focus-within .budget-btn .btn-text {
+    display: none;
+}
+
+.budget-input-group:focus-within .budget-btn .btn-icon {
+    display: block;
+}
+
+/* Interactive hover to reveal detail even when focused */
+.budget-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    background: #f0fdf4;
+}
+
+.budget-input-group:focus-within .budget-btn:hover {
+    width: 140px;
+    padding: 0 1.2rem;
+    border-radius: 0.75rem;
+    margin-left: 0;
+}
+
+.budget-input-group:focus-within .budget-btn:hover .btn-text {
+    display: block;
+}
+
+.budget-input-group:focus-within .budget-btn:hover .btn-icon {
+    display: none;
+}
+
+/* Specific Styles for AI Section to override globals */
+.ai-container input {
+    flex: 1;
+    /* Take available space */
+    min-width: 0;
+    /* Allow shrinking below content size if needed */
+    padding: 1rem;
+    border-radius: 0.75rem;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    outline: none;
+    font-size: 1.1rem;
+    color: #1f2937 !important;
+    /* Force dark text */
+    background: white !important;
+    caret-color: var(--accent);
+    transition: all 0.3s ease;
+}
+
+.ai-container input::placeholder {
+    color: #9ca3af;
+}
+
+.ai-container input:focus {
+    border-color: white;
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.2);
+}
+
+.ai-container button {
+    width: auto !important;
+    /* CRITICAL: Override global 100% width */
+    background: white;
+    color: var(--accent);
+    border: none;
+    padding: 0 1.5rem;
+    border-radius: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    font-size: 1.1rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    white-space: nowrap;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+}
+
+.ai-container .btn-icon {
+    display: none;
+}
+
+/* Interaction Logic: 
+   When Input is Focused (Typing) -> Button shrinks to Icon
+*/
+
+/* State: Typing (Input Focus) -> Shrink Button */
+.ai-container:focus-within button {
+    padding: 0 1rem;
+    max-width: 50px;
+    /* Shrink to icon size */
+}
+
+.ai-container:focus-within button .btn-text {
+    display: none;
+}
+
+.ai-container:focus-within button .btn-icon {
+    display: inline-block;
+}
+
+/* State: Hovering Button (Even while typing) -> Expand Button */
+.ai-container button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+    padding: 0 1.5rem;
+    max-width: 200px;
+    /* Expand back */
+}
+
+.ai-container button:hover .btn-text {
+    display: inline-block;
+}
+
+.ai-container button:hover .btn-icon {
+    display: none;
+}
+
+#ai-loading {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 0 1.5rem;
+    border-radius: 0.75rem;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
     }
 }

@@ -26,16 +26,24 @@ class FinanceManager:
             try:
                 # Get current asset details
                 asset = next((a for a in self.storage.get_assets() if str(a['id']) == str(asset_id)), None)
-                if asset:
-                    if type == 'expense':
-                        new_balance = asset['amount'] - transaction.amount
-                    else: # income
-                        new_balance = asset['amount'] + transaction.amount
-                        
-                    # Update balance (preserving last_updated_month if exists)
-                    self.storage.update_asset_balance(asset['id'], new_balance, asset.get('last_updated_month'))
+                if not asset:
+                    print(f"Warning: Asset {asset_id} not found, skipping balance update")
+                    return new_transaction
+                    
+                if type == 'expense':
+                    new_balance = asset['amount'] - transaction.amount
+                else:  # income
+                    new_balance = asset['amount'] + transaction.amount
+                    
+                # Update balance (preserving last_updated_month if exists)
+                self.storage.update_asset_balance(asset['id'], new_balance, asset.get('last_updated_month'))
+            except (KeyError, ValueError, TypeError) as e:
+                print(f"Error updating asset balance for asset {asset_id}: {type(e).__name__}: {e}")
+                # Don't fail the transaction, just log the error
             except Exception as e:
-                print(f"Error updating asset balance: {e}")
+                print(f"Unexpected error updating asset balance: {type(e).__name__}: {e}")
+                # Re-raise unexpected errors
+                raise
                 
         return new_transaction
 
@@ -58,7 +66,9 @@ class FinanceManager:
             try:
                 # 2. Get current asset details
                 asset = next((a for a in self.storage.get_assets() if str(a['id']) == str(transaction.asset_id)), None)
-                if asset:
+                if not asset:
+                    print(f"Warning: Asset {transaction.asset_id} not found during deletion, skipping balance reversal")
+                else:
                     # 3. Reverse the amount
                     if transaction.type == 'expense':
                         # If it was an expense, refund it
@@ -68,16 +78,66 @@ class FinanceManager:
                         new_balance = asset['amount'] - transaction.amount
                     
                     self.storage.update_asset_balance(asset['id'], new_balance, asset.get('last_updated_month'))
+            except (KeyError, ValueError, TypeError) as e:
+                print(f"Error reversing asset balance for asset {transaction.asset_id}: {type(e).__name__}: {e}")
             except Exception as e:
-                print(f"Error reversing asset balance move: {e}")
+                print(f"Unexpected error reversing asset balance: {type(e).__name__}: {e}")
+                raise
 
         # 4. Perform deletion
         return self.storage.delete_transaction(transaction_id)
 
     def update_transaction(self, transaction_id, amount, category, type, description, date):
+        """Update transaction and properly handle asset balance changes"""
         if not date:
             date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        return self.storage.update_transaction(transaction_id, amount, category, type, description, date)
+        
+        # 1. Get old transaction details BEFORE update
+        old_transaction = self.storage.get_transaction(transaction_id)
+        if not old_transaction:
+            raise ValueError(f"Transaction {transaction_id} not found")
+        
+        # 2. Reverse old asset impact if it had an asset
+        if old_transaction.asset_id:
+            try:
+                asset = next((a for a in self.storage.get_assets() if str(a['id']) == str(old_transaction.asset_id)), None)
+                if asset:
+                    # Reverse the old transaction's effect
+                    if old_transaction.type == 'expense':
+                        # Refund the expense
+                        reversed_balance = asset['amount'] + old_transaction.amount
+                    else:  # income
+                        # Remove the income
+                        reversed_balance = asset['amount'] - old_transaction.amount
+                    
+                    self.storage.update_asset_balance(asset['id'], reversed_balance, asset.get('last_updated_month'))
+            except Exception as e:
+                # Log but don't fail - we'll still update the transaction
+                print(f"Warning: Failed to reverse old asset balance: {e}")
+        
+        # 3. Update the transaction in database
+        self.storage.update_transaction(transaction_id, amount, category, type, description, date)
+        
+        # 4. Apply new asset impact (using the SAME asset_id as before)
+        # Note: Currently we don't support changing asset_id during edit
+        if old_transaction.asset_id:
+            try:
+                asset = next((a for a in self.storage.get_assets() if str(a['id']) == str(old_transaction.asset_id)), None)
+                if asset:
+                    # Apply the new transaction's effect
+                    if type == 'expense':
+                        new_balance = asset['amount'] - float(amount)
+                    else:  # income
+                        new_balance = asset['amount'] + float(amount)
+                    
+                    self.storage.update_asset_balance(asset['id'], new_balance, asset.get('last_updated_month'))
+            except Exception as e:
+                # This is more critical - we should log and potentially rollback
+                print(f"Error: Failed to apply new asset balance: {e}")
+                # Consider rolling back the transaction update here
+                raise
+        
+        return True
 
     # Budget management
     def set_budget(self, category, monthly_limit, month=None):
