@@ -2,14 +2,14 @@
     "version": 2,
     "builds": [
         {
-            "src": "money_tracker/web/app.py",
+            "src": "web/app.py",
             "use": "@vercel/python"
         }
     ],
     "routes": [
         {
             "src": "/(.*)",
-            "dest": "money_tracker/web/app.py"
+            "dest": "web/app.py"
         }
     ]
 }
