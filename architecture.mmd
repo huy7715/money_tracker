@@ -1,0 +1,51 @@
+flowchart TB
+    User([User])
+    Telegram([Telegram App])
+
+    subgraph Frontend [Web Interface]
+        HTML[UI Templates]
+        CSS[Vanilla CSS]
+        JS[script.js]
+    end
+
+    subgraph Backend [Flask Application]
+        Flask[app.py]
+        SocketIO[Socket.IO Server]
+        Manager[FinanceManager]
+    end
+
+    subgraph Data [Data Layer]
+        Storage[Storage Wrapper]
+        DB[(money_tracker.db)]
+    end
+
+    subgraph External [External Services]
+        AI[AI Service]
+        LLM[LLM APIs]
+        Bot[Telegram Bot]
+        Quota[ag-quota.exe]
+    end
+
+    %% Interactions
+    User <--> Frontend
+    Telegram <--> Bot
+    Frontend <--> Flask
+    Frontend <--> SocketIO
+    Flask <--> Manager
+    Bot <--> Manager
+    Manager <--> Storage
+    Storage <--> DB
+    Manager <--> AI
+    AI <--> LLM
+    Flask <--> Quota
+    
+    %% Styling
+    classDef frontend fill:#3b82f6,stroke:#1d4ed8,color:#fff
+    classDef backend fill:#10b981,stroke:#047857,color:#fff
+    classDef data fill:#f59e0b,stroke:#b45309,color:#fff
+    classDef external fill:#8b5cf6,stroke:#6d28d9,color:#fff
+    
+    class Frontend,HTML,CSS,JS frontend
+    class Backend,Flask,SocketIO,Manager backend
+    class Data,Storage,DB data
+    class External,AI,LLM,Bot,Quota external

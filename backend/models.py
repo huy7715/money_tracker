@@ -7,7 +7,6 @@ class Transaction:
     category: str
     type: str  # 'income' or 'expense'
     description: str
-    wallet: str = 'Cash'
     date: str = None
     asset_id: int = None
     id: int = None

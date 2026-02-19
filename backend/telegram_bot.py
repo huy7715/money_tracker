@@ -147,6 +147,21 @@ async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         'Investment': '📈', 'Other Income': '💰', 'Other': '📦', 'Savings': '🏦'
     }
     
+    msg = f"""
+📊 *Báo cáo {month_name}*
+
+💰 Thu nhập: {format_vnd(summary['income'])}
+💸 Chi tiêu: {format_vnd(summary['expense'])}
+📈 Ròng: {format_vnd(summary['net'])}
+📝 Giao dịch: {summary['count']}
+"""
+    
+    if spending:
+        msg += "\n*Chi tiết chi tiêu:*\n"
+        for cat, amount in sorted(spending.items(), key=lambda x: x[1], reverse=True):
+            emoji = emojis.get(cat, '📦')
+            msg += f"{emoji} {cat}: {format_vnd(amount)}\n"
+    
     await safe_reply(update, msg)
 
 
@@ -158,6 +173,12 @@ async def budget_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not status:
         await safe_reply(update, "📊 Chưa có budget nào được thiết lập.\n\nThử: `set food budget 3m`")
         return
+    
+    msg = f"📊 *Budget tháng {datetime.now().strftime('%B %Y')}*\n\n"
+    for s in status:
+        icon = '🔴' if s['level'] == 'danger' else ('🟡' if s['level'] == 'warning' else '🟢')
+        msg += f"{icon} *{s['category']}*: {format_vnd(s['spent'])} / {format_vnd(s['limit'])} ({s['percentage']:.0f}%)\n"
+        msg += f"    Còn lại: {format_vnd(s['remaining'])}\n\n"
     
     await safe_reply(update, msg)
 

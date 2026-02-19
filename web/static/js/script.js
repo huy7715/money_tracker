@@ -3,6 +3,57 @@ const WHITESPACE_REGEX = /\s+/g;
 const DOT_REGEX = /\./g;
 const COMMA_REGEX = /,/g;
 
+// --- Toast Notification System ---
+function showToast(message, type = 'success', duration = 3000) {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+    }
+
+    const icons = {
+        success: '✅',
+        error: '❌',
+        warning: '⚠️',
+        info: 'ℹ️'
+    };
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.innerHTML = `
+        <span class="toast-icon">${icons[type] || '📌'}</span>
+        <span>${message}</span>
+    `;
+    container.appendChild(toast);
+
+    setTimeout(() => {
+        toast.classList.add('toast-out');
+        setTimeout(() => toast.remove(), 300);
+    }, duration);
+}
+
+// --- Relative Date Formatter ---
+function formatRelativeDate(dateStr) {
+    if (!dateStr) return '';
+    const now = new Date();
+    const date = new Date(dateStr.replace(' ', 'T'));
+    const diffMs = now - date;
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    const time = date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+
+    if (diffDays === 0) {
+        // Check if actually today
+        if (now.toDateString() === date.toDateString()) return `Hôm nay ${time}`;
+        return `Hôm qua ${time}`;
+    }
+    if (diffDays === 1) return `Hôm qua ${time}`;
+    if (diffDays < 7) return `${diffDays} ngày trước`;
+    return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ` ${time}`;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     // --- Socket.IO Real-time Sync ---
     const socket = io();
@@ -14,6 +65,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 loadDiary(data.date);
             }
             loadDiaryHistory();
+        } else if (data.type === 'goal') {
+            const year = EL.goalYearSelector ? parseInt(EL.goalYearSelector.value) : new Date().getFullYear();
+            fetchGoals(year);
         } else {
             const selectedMonth = EL.monthSelector ? EL.monthSelector.value : null;
             fetchData(selectedMonth);
@@ -74,8 +128,52 @@ document.addEventListener('DOMContentLoaded', () => {
         bulkCountBadge: document.getElementById('bulk-count-badge'),
         bulkTextInput: document.getElementById('bulk-text-input'),
         bulkExtractBtn: document.getElementById('bulk-extract-btn'),
-        bulkConfirmBtn: document.getElementById('bulk-confirm-btn')
+        bulkConfirmBtn: document.getElementById('bulk-confirm-btn'),
+        // Goals elements
+        goalsTrack: document.getElementById('goals-track'),
+        goalsEmpty: document.getElementById('goals-empty'),
+        goalYearSelector: document.getElementById('goal-year-selector'),
+        addGoalBtn: document.getElementById('add-goal-btn'),
+        goalPrevBtn: document.getElementById('goal-prev-btn'),
+        goalNextBtn: document.getElementById('goal-next-btn'),
+        goalsSummary: {
+            completed: document.getElementById('goals-completed-stat'),
+            progress: document.getElementById('goals-total-progress'),
+            percent: document.getElementById('goals-percent-stat')
+        },
+        goalModal: document.getElementById('goal-modal'),
+        goalForm: document.getElementById('goal-form'),
+        goalId: document.getElementById('goal-id'),
+        goalTitle: document.getElementById('goal-title'),
+        goalType: document.getElementById('goal-type'),
+        goalTarget: document.getElementById('goal-target'),
+        goalCurrent: document.getElementById('goal-current'),
+        goalModalTitle: document.getElementById('goal-modal-title'),
+        goalIconPicker: document.getElementById('goal-icon-picker'),
+        goalColorPicker: document.getElementById('goal-color-picker'),
+        goalNotes: document.getElementById('goal-notes'),
+        deleteGoalBtn: document.getElementById('delete-goal-btn')
     };
+
+    // --- Interactive Cursor Glow ---
+    const glow = document.getElementById('cursor-glow');
+    if (glow) {
+        document.addEventListener('mousemove', (e) => {
+            const x = e.clientX;
+            const y = e.clientY;
+
+            // Using requestAnimationFrame for performance
+            requestAnimationFrame(() => {
+                glow.style.transform = `translate(calc(${x}px - 50%), calc(${y}px - 50%))`;
+                glow.style.opacity = '1';
+            });
+        });
+
+        // Hide when mouse leaves the window
+        document.addEventListener('mouseleave', () => {
+            glow.style.opacity = '0';
+        });
+    }
 
     // Event Delegation for Transaction List (Edit/Delete) - Replaces inline onclick
     if (EL.transactionList) {
@@ -95,6 +193,25 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    // Event Delegation for Assets
+    const liquidList = document.getElementById('liquid-assets-list');
+    const savingsList = document.getElementById('savings-assets-list');
+    [liquidList, savingsList].forEach(list => {
+        if (list) {
+            list.addEventListener('click', (e) => {
+                const editBtn = e.target.closest('.edit-asset-btn');
+                if (editBtn) {
+                    try {
+                        const asset = JSON.parse(editBtn.dataset.asset);
+                        window.editAsset(asset);
+                    } catch (err) {
+                        console.error('Error parsing asset data:', err);
+                    }
+                }
+            });
+        }
+    });
 
     // Utility: Debounce function
     function debounce(func, wait) {
@@ -203,11 +320,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 EL.aiModelBadge.textContent = `${data.provider} (${data.model})`;
                 if (EL.modelSelector) EL.modelSelector.value = data.provider.toLowerCase();
             } else {
-                EL.aiModelBadge.textContent = 'AI Ready';
+                EL.aiModelBadge.textContent = 'AI Sẵn sàng';
             }
         } catch (error) {
             console.error('Error fetching AI info:', error);
-            EL.aiModelBadge.textContent = 'AI Offline';
+            EL.aiModelBadge.textContent = 'AI Ngoại tuyến';
         }
     }
     fetchAIInfo();
@@ -215,7 +332,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Model Selector Change Logic
     EL.modelSelector?.addEventListener('change', async (e) => {
         const provider = e.target.value;
-        if (EL.aiModelBadge) EL.aiModelBadge.textContent = 'Switching...';
+        if (EL.aiModelBadge) EL.aiModelBadge.textContent = 'Đang chuyển đổi...';
 
         try {
             const response = await fetch('/api/switch-model', {
@@ -227,12 +344,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (result.success) {
                 fetchAIInfo();
             } else {
-                alert('Switch failed: ' + result.error);
+                alert('Chuyển đổi thất bại: ' + result.error);
                 fetchAIInfo();
             }
         } catch (error) {
             console.error('Error switching model:', error);
-            alert('Failed to switch model');
+            alert('Không thể chuyển đổi mô hình');
             fetchAIInfo();
         }
     });
@@ -258,7 +375,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await response.json();
 
             if (result.error) {
-                alert('AI Error: ' + result.error);
+                alert('Lỗi AI: ' + result.error);
             } else if (result.intent === 'budget') {
                 // Populate Budget Form
                 if (result.category && EL.budgetCategory) {
@@ -353,7 +470,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (error) {
             console.error('AI Assistant Error:', error);
-            alert('AI Assistant Error: ' + error.message);
+            showToast('Lỗi AI: ' + error.message, 'error');
         } finally {
             aiBtn.style.display = 'block';
             aiLoading.style.display = 'none';
@@ -514,14 +631,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (response.ok) {
                 EL.form.reset();
+                showToast('Đã thêm giao dịch thành công!', 'success');
                 const selectedMonth = EL.monthSelector ? EL.monthSelector.value : null;
                 fetchData(selectedMonth);
             } else {
-                alert('Failed to add transaction');
+                showToast('Không thể thêm giao dịch', 'error');
             }
         } catch (error) {
             console.error('Error:', error);
-            alert('An error occurred');
+            showToast('Đã xảy ra lỗi', 'error');
         }
     });
 
@@ -554,7 +672,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (EL.diaryTitle) EL.diaryTitle.value = data.title || "";
         } catch (error) {
             console.error('Error loading diary:', error);
-            EL.diaryContent.innerHTML = "Failed to load thoughts.";
+            EL.diaryContent.innerHTML = "Không thể tải nội dung.";
         }
     }
 
@@ -583,7 +701,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
 
                 if (filteredHistory.length === 0) {
-                    EL.diaryHistoryList.innerHTML = '<p style="font-size: 0.75rem; color: #9ca3af; text-align: center;">No matching notes</p>';
+                    EL.diaryHistoryList.innerHTML = '<p style="font-size: 0.75rem; color: #9ca3af; text-align: center;">Không tìm thấy ghi chú</p>';
                     return;
                 }
 
@@ -629,11 +747,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         btn.className = 'note-item';
 
                         // Use title if provided, otherwise default to "Note for [Date]"
-                        const displayTitle = title && title.trim() ? title : `Note for ${date}`;
+                        const displayTitle = title && title.trim() ? title : `Bút ký ngày ${date}`;
 
                         btn.innerHTML = `
                             <span style="font-weight: 500;">${displayTitle}</span>
-                            <span class="day-chip">Day ${day}</span>
+                            <span class="day-chip">Ngày ${day}</span>
                         `;
                         btn.onclick = () => {
                             EL.diaryDate.value = date;
@@ -655,7 +773,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                 });
             } else {
-                EL.diaryHistoryList.innerHTML = '<p style="font-size: 0.75rem; color: #9ca3af; text-align: center;">No notes recorded yet</p>';
+                EL.diaryHistoryList.innerHTML = '<p style="font-size: 0.75rem; color: #9ca3af; text-align: center;">Chưa có ghi chú nào</p>';
             }
         } catch (error) {
             console.error('Error loading history:', error);
@@ -666,10 +784,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const date = EL.diaryDate.value;
         const content = EL.diaryContent.innerHTML;
         const title = EL.diaryTitle ? EL.diaryTitle.value : "";
-        if (!date || !content.trim()) return;
+        if (!date) return;
 
         if (EL.saveDiaryBtn) {
-            EL.saveDiaryBtn.textContent = isAuto ? "Auto-saving..." : "Saving...";
+            EL.saveDiaryBtn.textContent = isAuto ? "Đang tự lưu..." : "Đang lưu...";
             if (!isAuto) EL.saveDiaryBtn.disabled = true;
         }
 
@@ -680,20 +798,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({ date, content, title })
             });
             if (response.ok) {
-                if (EL.saveDiaryBtn) EL.saveDiaryBtn.textContent = isAuto ? "Auto-saved! ✓" : "Saved! ✓";
+                if (EL.saveDiaryBtn) EL.saveDiaryBtn.textContent = isAuto ? "Đã tự lưu! ✓" : "Đã lưu! ✓";
                 loadDiaryHistory();
                 setTimeout(() => {
                     if (EL.saveDiaryBtn) {
-                        EL.saveDiaryBtn.textContent = "Save Note";
+                        EL.saveDiaryBtn.textContent = "Lưu ghi chú";
                         EL.saveDiaryBtn.disabled = false;
                     }
                 }, 2000);
             } else if (!isAuto) {
-                alert('Failed to save note');
+                alert('Không thể lưu ghi chú');
             }
         } catch (error) {
             console.error('Error saving diary:', error);
-            if (!isAuto) alert('An error occurred while saving');
+            if (!isAuto) alert('Đã xảy ra lỗi khi lưu');
         } finally {
             if (!isAuto && EL.saveDiaryBtn) {
                 EL.saveDiaryBtn.disabled = false;
@@ -788,17 +906,23 @@ document.addEventListener('DOMContentLoaded', () => {
                         li.innerHTML = `
                             <div class="info">
                                 <span class="category">${t.category}</span>
-                                <span class="date">${t.date}</span>
+                                <span class="date">${formatRelativeDate(t.date)}</span>
                             </div>
                             <div class="right-section">
                                 <div class="amount">
                                     ${t.type === 'expense' ? '-' : '+'}${Number(t.amount || 0).toLocaleString('vi-VN')} ₫
                                 </div>
                                 <div class="actions">
-                                    <button class="edit-btn" onclick="editTransaction(${t.id}, ${t.amount}, '${t.category}', '${t.type}', '${t.description}', '${t.date}')">
+                                    <button class="edit-btn" 
+                                        data-id="${t.id}" 
+                                        data-amount="${t.amount}" 
+                                        data-category="${t.category}" 
+                                        data-type="${t.type}" 
+                                        data-description="${t.description || ''}" 
+                                        data-date="${t.date}">
                                         <i class="fas fa-edit"></i> Edit
                                     </button>
-                                    <button class="delete-btn" onclick="deleteTransaction(${t.id})">
+                                    <button class="delete-btn" data-id="${t.id}">
                                         <i class="fas fa-trash"></i> Delete
                                     </button>
                                 </div>
@@ -807,7 +931,17 @@ document.addEventListener('DOMContentLoaded', () => {
                         fragment.appendChild(li);
                     });
                     EL.transactionList.innerHTML = '';
-                    EL.transactionList.appendChild(fragment);
+                    if (fragment.children.length === 0) {
+                        EL.transactionList.innerHTML = `
+                            <div class="empty-state">
+                                <div class="empty-state-icon">📋</div>
+                                <div class="empty-state-text">Chưa có giao dịch nào</div>
+                                <div class="empty-state-hint">Dùng AI Assistant hoặc form để thêm giao dịch đầu tiên!</div>
+                            </div>
+                        `;
+                    } else {
+                        EL.transactionList.appendChild(fragment);
+                    }
                 }
             }
 
@@ -932,7 +1066,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     maintainAspectRatio: false,
                     plugins: {
                         legend: {
-                            position: 'right',
+                            position: window.innerWidth < 768 ? 'bottom' : 'right',
                         }
                     }
                 }
@@ -942,15 +1076,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Expose functions to global scope
     window.deleteTransaction = async (id) => {
-        if (!confirm('Are you sure you want to delete this transaction?')) return;
+        if (!confirm('Bạn có chắc muốn xóa giao dịch này?')) return;
 
         try {
             const response = await fetch(`/delete/${id}`, { method: 'DELETE' });
             if (response.ok) {
+                showToast('Đã xóa giao dịch', 'success');
                 const selectedMonth = EL.monthSelector ? EL.monthSelector.value : null;
                 fetchData(selectedMonth);
             }
-            else alert('Failed to delete');
+            else showToast('Không thể xóa giao dịch', 'error');
         } catch (error) {
             console.error('Error deleting:', error);
         }
@@ -1011,10 +1146,11 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (response.ok) {
                 closeModal();
+                showToast('Đã cập nhật giao dịch', 'success');
                 const selectedMonth = EL.monthSelector ? EL.monthSelector.value : null;
                 fetchData(selectedMonth);
             } else {
-                alert('Failed to update');
+                showToast('Không thể cập nhật', 'error');
             }
         } catch (error) {
             console.error('Error updating:', error);
@@ -1077,7 +1213,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (!category || !limit || limit <= 0) {
-            alert('Please select a category and enter a valid limit');
+            showToast('Vui lòng chọn danh mục và nhập giới hạn hợp lệ', 'warning');
             return;
         }
 
@@ -1097,17 +1233,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 EL.budgetCategory.value = '';
                 EL.budgetLimit.value = '';
                 delete EL.budgetLimit.dataset.adjustment;
-                // Reset label text if it was changed
                 const label = EL.budgetLimit.parentElement.querySelector('label');
-                if (label) label.textContent = 'Monthly Limit';
+                if (label) label.textContent = 'Giới hạn tháng';
+                showToast('Đã cập nhật ngân sách', 'success');
                 const selectedMonth = EL.monthSelector ? EL.monthSelector.value : null;
-                fetchData(selectedMonth); // Refresh everything including budget status
+                fetchData(selectedMonth);
             } else {
-                alert('Failed to set budget');
+                showToast('Không thể thiết lập ngân sách', 'error');
             }
         } catch (error) {
             console.error('Error setting budget:', error);
-            alert('An error occurred');
+            showToast('Đã xảy ra lỗi', 'error');
         }
     });
 
@@ -1121,7 +1257,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!EL.budgetList) return;
 
             if (budgets.length === 0) {
-                EL.budgetList.innerHTML = '<p style="text-align: center; opacity: 0.7;">No budgets set yet. Add one above!</p>';
+                EL.budgetList.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📊</div>
+                        <div class="empty-state-text">Chưa có ngân sách nào</div>
+                        <div class="empty-state-hint">Thêm ngân sách ở form phía trên!</div>
+                    </div>
+                `;
                 return;
             }
 
@@ -1129,82 +1271,70 @@ document.addEventListener('DOMContentLoaded', () => {
             budgets.forEach(budget => {
                 const percentage = Math.min(budget.percentage, 100);
 
-                // Determine color based on level
-                let barColor, bgColor, statusText;
+                // Determine level class and status text
+                let levelClass, statusText, barColor;
                 if (budget.level === 'danger') {
+                    levelClass = 'danger';
                     barColor = '#ef4444';
-                    bgColor = 'rgba(239, 68, 68, 0.1)';
-                    statusText = '⚠️ Over Budget!';
+                    statusText = '⚠️ Vượt ngân sách!';
                 } else if (budget.level === 'warning') {
+                    levelClass = 'warning';
                     barColor = '#f59e0b';
-                    bgColor = 'rgba(245, 158, 11, 0.1)';
-                    statusText = '⚡ Close to limit';
+                    statusText = '⚡ Gần đạt giới hạn';
                 } else {
+                    levelClass = 'ok';
                     barColor = '#10b981';
-                    bgColor = 'rgba(16, 185, 129, 0.1)';
-                    statusText = '✓ On track';
+                    statusText = '✓ Đang tốt';
                 }
 
                 const item = document.createElement('div');
-                item.className = 'budget-card';
-                item.style.cssText = `
-                    background: rgba(255, 255, 255, 0.95);
-                    padding: 1.25rem;
-                    border-radius: 1rem;
-                    border-left: 6px solid ${barColor};
-                    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-                    color: #1f2937;
-                    position: relative;
-                    overflow: hidden;
-                `;
+                item.className = `budget-card budget-card--${levelClass}`;
 
                 item.innerHTML = `
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+                    <div class="budget-header">
                         <div>
-                            <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: #6b7280; margin-bottom: 0.25rem;">Category</div>
-                            <strong style="font-size: 1.25rem; color: #111827;">${budget.category}</strong>
+                            <div class="budget-category-label">Danh mục</div>
+                            <div class="budget-category-name">${budget.category}</div>
                         </div>
-                        <div style="text-align: right;">
-                            <span style="display: inline-block; padding: 0.25rem 0.75rem; border-radius: 2rem; font-size: 0.75rem; font-weight: 700; background: ${bgColor}; color: ${barColor}; border: 1px solid ${barColor}44;">
+                        <div>
+                            <span class="budget-status-badge budget-status-badge--${levelClass}">
                                 ${statusText}
                             </span>
                         </div>
                     </div>
                     
-                    <div style="background: #f3f4f6; height: 1rem; border-radius: 0.5rem; overflow: hidden; margin-bottom: 1rem; position: relative;">
-                        <div style="background: ${barColor}; height: 100%; width: ${percentage}%; transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1); border-radius: 0.5rem;"></div>
+                    <div class="budget-progress-bar">
+                        <div class="budget-progress-fill" style="background: ${barColor}; width: ${percentage}%;"></div>
                     </div>
                     
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                        <div style="background: #f9fafb; padding: 0.75rem; border-radius: 0.5rem;">
-                            <div style="font-size: 0.7rem; color: #6b7280; font-weight: 600; text-transform: uppercase;">Spent</div>
-                            <div style="font-size: 1rem; font-weight: 700;">${formatVND(budget.spent)} ₫</div>
+                    <div class="budget-stats-grid">
+                        <div class="budget-stat-box">
+                            <div class="stat-label">Đã chi</div>
+                            <div class="stat-value">${formatVND(budget.spent)} ₫</div>
                         </div>
-                        <div style="background: #f9fafb; padding: 0.75rem; border-radius: 0.5rem;">
-                            <div style="font-size: 0.7rem; color: #6b7280; font-weight: 600; text-transform: uppercase;">Limit</div>
-                            <div style="font-size: 1rem; font-weight: 700;">${formatVND(budget.limit)} ₫</div>
+                        <div class="budget-stat-box">
+                            <div class="stat-label">Giới hạn</div>
+                            <div class="stat-value">${formatVND(budget.limit)} ₫</div>
                         </div>
                     </div>
                     
-                    <div style="margin-top: 1rem; display: flex; justify-content: space-between; align-items: center;">
-                        <div style="font-size: 0.875rem; font-weight: 600;">
+                    <div class="budget-footer">
+                        <div class="budget-remaining">
                             ${budget.remaining >= 0 ?
-                        `Remaining: <span style="color: #10b981;">${formatVND(budget.remaining)} ₫</span>` :
-                        `Over by: <span style="color: #ef4444;">${formatVND(Math.abs(budget.remaining))} ₫</span>`}
+                        `Còn lại: <span style="color: #10b981;">${formatVND(budget.remaining)} ₫</span>` :
+                        `Vượt: <span style="color: #ef4444;">${formatVND(Math.abs(budget.remaining))} ₫</span>`}
                         </div>
-                        <div style="display: flex; gap: 0.5rem;">
-                            <button onclick="editBudget('${budget.category}', ${budget.limit})" style="background: #10b981; border: none; color: white; font-size: 0.75rem; font-weight: 700; cursor: pointer; padding: 0.4rem 0.8rem; border-radius: 0.5rem; transition: all 0.2s;">
-                                Edit
+                        <div class="budget-actions">
+                            <button class="budget-edit-btn" onclick="editBudget('${budget.category}', ${budget.limit})">
+                                Sửa
                             </button>
-                            <button onclick="deleteBudget('${budget.category}')" style="background: none; border: none; color: #ef4444; font-size: 0.75rem; font-weight: 700; cursor: pointer; text-decoration: underline; padding: 0.5rem;">
-                                Remove
+                            <button class="budget-remove-btn" onclick="deleteBudget('${budget.category}')">
+                                Xóa
                             </button>
                         </div>
                     </div>
                     
-                    <div style="position: absolute; right: -10px; top: -10px; font-size: 4rem; opacity: 0.05; pointer-events: none; transform: rotate(15deg);">
-                        ${budget.category.split(' ')[0]}
-                    </div>
+                    <div class="budget-watermark">${budget.category.split(' ')[0]}</div>
                 `;
                 fragment.appendChild(item);
             });
@@ -1232,17 +1362,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Delete Budget
     window.deleteBudget = async (category) => {
-        if (!confirm(`Delete budget for ${category}?`)) return;
+        if (!confirm(`Xóa ngân sách cho ${category}?`)) return;
 
         try {
             const response = await fetch(`/api/budget/${encodeURIComponent(category)}`, {
                 method: 'DELETE'
             });
             if (response.ok) {
+                showToast(`Đã xóa ngân sách ${category}`, 'success');
                 const selectedMonth = EL.monthSelector ? EL.monthSelector.value : null;
                 fetchBudgetStatus(selectedMonth);
             } else {
-                alert('Failed to delete budget');
+                showToast('Không thể xóa ngân sách', 'error');
             }
         } catch (error) {
             console.error('Error deleting budget:', error);
@@ -1362,7 +1493,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 card.innerHTML = `
                     <div class="asset-actions">
-                        <button class="asset-action-btn" onclick='editAsset(${JSON.stringify(a).replace(/'/g, "&#39;")})' title="Edit">
+                        <button class="asset-action-btn edit-asset-btn" data-asset='${JSON.stringify(a).replace(/'/g, "&apos;")}' title="Edit">
                             <i class="fas fa-pen"></i>
                         </button>
                     </div>
@@ -1437,7 +1568,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.deleteAsset = async () => {
         const id = document.getElementById('asset-id').value;
         if (!id) return;
-        if (!confirm('Are you sure? Transactions linked to this asset will stay but become unlinked.')) return;
+        if (!confirm('Bạn có chắc không? Các giao dịch liên kết sẽ vẫn còn nhưng mất liên kết.')) return;
 
         try {
             const res = await fetch(`/api/assets/${id}`, { method: 'DELETE' });
@@ -1484,13 +1615,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (result.success || res.ok) {
                 closeAssetModal();
+                showToast('Đã lưu tài sản thành công', 'success');
                 fetchAssets();
             } else {
-                alert(result.error || 'Failed to save asset');
+                showToast(result.error || 'Không thể lưu tài sản', 'error');
             }
         } catch (e) {
             console.error(e);
-            alert('Error saving asset');
+            showToast('Lỗi khi lưu tài sản', 'error');
         }
     });
 
@@ -1527,7 +1659,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('bulk-extract-btn')?.addEventListener('click', async () => {
         const text = document.getElementById('bulk-text-input').value;
-        if (!text.trim()) return alert("Please paste some text first!");
+        if (!text.trim()) return showToast('Vui lòng dán văn bản trước!', 'warning');
 
         if (text.length > 50000) {
             if (!confirm("This is a very long text. Analysis might take longer or hit limits. Continue?")) return;
@@ -1555,7 +1687,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (error) {
             console.error('Bulk extraction failed:', error);
-            alert("An error occurred during scanning.");
+            showToast('Đã xảy ra lỗi khi phân tích', 'error');
             backToBulkInput();
         }
     });
@@ -1647,12 +1779,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 if (res.ok) successCount++;
             }
-            alert(`Successfully imported ${successCount} transactions!`);
+            showToast(`Đã nhập ${successCount} giao dịch thành công!`, 'success');
             closeBulkModal();
-            fetchData(); // Refresh main list
+            fetchData();
         } catch (error) {
             console.error('Error saving bulk:', error);
-            alert("Error while saving transactions.");
+            showToast('Lỗi khi lưu giao dịch', 'error');
         } finally {
             btn.disabled = false;
             btn.innerHTML = originalText;
@@ -1772,5 +1904,413 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
+
+    // ========== FINANCIAL GOALS ==========
+    const GOAL_TYPE_LABELS = {
+        'savings': '💰 Tiết kiệm',
+        'income': '📈 Thu nhập',
+        'expense_limit': '📉 Giới hạn chi tiêu',
+        'custom': '✨ Cá nhân'
+    };
+
+    // Populate year selector
+    function initGoalYearSelector() {
+        if (!EL.goalYearSelector) return;
+        const currentYear = new Date().getFullYear();
+        EL.goalYearSelector.innerHTML = '';
+        for (let y = currentYear + 1; y >= currentYear - 2; y--) {
+            const opt = document.createElement('option');
+            opt.value = y;
+            opt.textContent = `Năm ${y}`;
+            if (y === currentYear) opt.selected = true;
+            EL.goalYearSelector.appendChild(opt);
+        }
+        EL.goalYearSelector.addEventListener('change', () => {
+            fetchGoals(parseInt(EL.goalYearSelector.value));
+        });
+    }
+
+    async function fetchGoals(year) {
+        if (!EL.goalsTrack) return;
+        try {
+            const response = await fetch(`/api/goals?year=${year}`);
+            const goals = await response.json();
+            renderGoals(goals);
+        } catch (e) {
+            console.error('Error fetching goals:', e);
+        }
+    }
+
+    function formatGoalAmount(val) {
+        if (val == null || val === '') return '—';
+        const num = Number(val);
+        if (isNaN(num)) return val;
+        if (num >= 1000000) return `${(num / 1000000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })}tr`;
+        if (num >= 1000) return `${(num / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 0 })}k`;
+        return num.toLocaleString('vi-VN');
+    }
+
+    function renderGoals(goals) {
+        if (!EL.goalsTrack) return;
+
+        if (!goals || goals.length === 0) {
+            EL.goalsTrack.innerHTML = '';
+            EL.goalsTrack.appendChild(EL.goalsEmpty);
+            EL.goalsEmpty.style.display = 'flex';
+
+            // Reset summary
+            if (EL.goalsSummary.completed) EL.goalsSummary.completed.textContent = '0/0';
+            if (EL.goalsSummary.progress) EL.goalsSummary.progress.style.width = '0%';
+            if (EL.goalsSummary.percent) EL.goalsSummary.percent.textContent = '0%';
+            return;
+        }
+
+        EL.goalsEmpty.style.display = 'none';
+        EL.goalsTrack.innerHTML = '';
+
+        let completedCount = 0;
+        let totalProgressPct = 0;
+
+        goals.forEach(goal => {
+            const card = document.createElement('div');
+            const color = goal.color || '#6366f1';
+            const icon = goal.icon || '🎯';
+
+            card.className = `goal-card ${goal.is_completed ? 'completed' : ''}`;
+            card.style.setProperty('--goal-color', color);
+
+            const progress = goal.target_amount > 0
+                ? Math.min(100, Math.round((goal.current_amount / goal.target_amount) * 100))
+                : (goal.is_completed ? 100 : 0);
+
+            if (goal.is_completed) completedCount++;
+            totalProgressPct += progress;
+
+            card.innerHTML = `
+                <div class="goal-header">
+                    <div class="goal-icon" style="background: ${color}20; color: ${color};">${icon}</div>
+                    <div class="goal-info">
+                        <div class="goal-title">${goal.title}</div>
+                        <div class="goal-type-badge">${getGoalTypeText(goal.goal_type)}</div>
+                    </div>
+                </div>
+                <div class="goal-progress-section">
+                    <div class="goal-progress-text">
+                        <span>${formatGoalAmount(goal.current_amount)} / ${formatGoalAmount(goal.target_amount)}</span>
+                        <span>${progress}%</span>
+                    </div>
+                    <div class="goal-progress-mini">
+                        <div class="goal-progress-fill" style="width: ${progress}%; background: ${color};"></div>
+                    </div>
+                </div>
+                <div class="goal-status">
+                    ${goal.is_completed ? '<span>✅ Hoàn thành</span>' : '<span>⏳ Đang thực hiện</span>'}
+                    <div class="goal-toggle-check ${goal.is_completed ? 'checked' : ''}" title="${goal.is_completed ? 'Bỏ đánh dấu' : 'Đánh dấu hoàn thành'}">
+                        <i class="fas fa-check"></i>
+                    </div>
+                </div>
+
+                <!-- Journal Popover -->
+                <div class="goal-journal-popover" style="--goal-color: ${color}">
+                    <div class="journal-popover-header">
+                        <i class="fas fa-journal-whills"></i>
+                        <span>Nhật ký tiến độ</span>
+                    </div>
+                    <div class="journal-popover-content">
+                        ${goal.notes ? goal.notes.replace(/\n/g, '<br>') : '<span class="journal-empty-note">Chưa có ghi chú nào cho mục tiêu này.</span>'}
+                    </div>
+                </div>
+            `;
+
+            // Card click for edit (except toggle)
+            card.addEventListener('click', (e) => {
+                if (e.target.closest('.goal-toggle-check')) return;
+                openGoalModal(goal);
+            });
+
+            // Toggle click logic
+            const toggle = card.querySelector('.goal-toggle-check');
+            if (toggle) {
+                toggle.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    try {
+                        const res = await fetch(`/api/goals/${goal.id}/toggle`, { method: 'PATCH' });
+                        const data = await res.json();
+                        if (data.success) {
+                            const year = EL.goalYearSelector ? parseInt(EL.goalYearSelector.value) : new Date().getFullYear();
+                            fetchGoals(year);
+                        }
+                    } catch (err) {
+                        console.error('Toggle error:', err);
+                    }
+                });
+            }
+
+            EL.goalsTrack.appendChild(card);
+        });
+
+        // Update Yearly Summary
+        const avgProgress = goals.length > 0 ? Math.round(totalProgressPct / goals.length) : 0;
+        if (EL.goalsSummary.completed) EL.goalsSummary.completed.textContent = `${completedCount}/${goals.length}`;
+        if (EL.goalsSummary.progress) EL.goalsSummary.progress.style.width = `${avgProgress}%`;
+        if (EL.goalsSummary.percent) EL.goalsSummary.percent.textContent = `${avgProgress}%`;
+    }
+
+    function getGoalTypeText(type) {
+        const types = {
+            'savings': 'Tiết kiệm',
+            'income': 'Thu nhập',
+            'expense_limit': 'Giới hạn chi',
+            'custom': 'Cá nhân'
+        };
+        return types[type] || 'Khác';
+    }
+
+    function openGoalModal(goalData) {
+        if (!EL.goalModal) return;
+        const isEdit = goalData && goalData.id;
+
+        EL.goalModalTitle.textContent = isEdit ? 'Chỉnh Sửa Mục Tiêu' : 'Thêm Mục Tiêu Mới';
+        EL.goalId.value = isEdit ? goalData.id : '';
+        EL.goalTitle.value = isEdit ? goalData.title : '';
+        EL.goalType.value = isEdit ? goalData.goal_type : 'savings';
+        EL.goalTarget.value = isEdit ? goalData.target_amount : '';
+        EL.goalCurrent.value = isEdit ? goalData.current_amount : '';
+        EL.goalNotes.value = isEdit ? (goalData.notes || '') : '';
+
+        // Trigger UI update logic for labels/placeholders
+        EL.goalType.dispatchEvent(new Event('change'));
+
+        // Show/hide delete button
+        EL.deleteGoalBtn.style.display = isEdit ? 'block' : 'none';
+
+        // Set icon picker
+        const activeIcon = isEdit ? (goalData.icon || '🎯') : '🎯';
+        EL.goalIconPicker.querySelectorAll('.icon-opt').forEach(btn => {
+            btn.classList.toggle('selected', btn.dataset.icon === activeIcon);
+        });
+
+        // Set color picker
+        const activeColor = isEdit ? (goalData.color || '#6366f1') : '#6366f1';
+        EL.goalColorPicker.querySelectorAll('.color-opt').forEach(btn => {
+            btn.classList.toggle('selected', btn.dataset.color === activeColor);
+        });
+
+        EL.goalModal.style.display = 'flex';
+    }
+
+    function closeGoalModal() {
+        if (EL.goalModal) EL.goalModal.style.display = 'none';
+    }
+    // Expose globally for onclick
+    window.closeGoalModal = closeGoalModal;
+
+    async function saveGoal(e) {
+        e.preventDefault();
+        const id = EL.goalId.value;
+        const title = EL.goalTitle.value.trim();
+        const goalType = EL.goalType.value;
+        const targetRaw = EL.goalTarget.value.trim();
+        const currentRaw = EL.goalCurrent.value.trim();
+        const year = EL.goalYearSelector ? parseInt(EL.goalYearSelector.value) : new Date().getFullYear();
+
+        // Parse target: support "100tr" "50m" "24"
+        let targetAmount = null;
+        if (targetRaw) {
+            const normalized = targetRaw.replace(WHITESPACE_REGEX, '').replace(DOT_REGEX, '').replace(COMMA_REGEX, '.');
+            if (normalized.match(/tr|triệu/i)) {
+                targetAmount = parseFloat(normalized) * 1000000;
+            } else if (normalized.match(/m$/i)) {
+                targetAmount = parseFloat(normalized) * 1000000;
+            } else if (normalized.match(/k$/i)) {
+                targetAmount = parseFloat(normalized) * 1000;
+            } else {
+                targetAmount = parseFloat(normalized);
+            }
+            if (isNaN(targetAmount)) targetAmount = null;
+        } else if (goalType === 'custom') {
+            // Default to 100 for custom goals if not specified
+            targetAmount = 100;
+        }
+
+        let currentAmount = 0;
+        if (currentRaw) {
+            const normalizedC = currentRaw.replace(WHITESPACE_REGEX, '').replace(DOT_REGEX, '').replace(COMMA_REGEX, '.');
+            if (normalizedC.match(/tr|triệu/i)) {
+                currentAmount = parseFloat(normalizedC) * 1000000;
+            } else if (normalizedC.match(/m$/i)) {
+                currentAmount = parseFloat(normalizedC) * 1000000;
+            } else if (normalizedC.match(/k$/i)) {
+                currentAmount = parseFloat(normalizedC) * 1000;
+            } else {
+                currentAmount = parseFloat(normalizedC);
+            }
+            if (isNaN(currentAmount)) currentAmount = 0;
+        }
+
+        const selectedIcon = EL.goalIconPicker.querySelector('.icon-opt.selected')?.dataset.icon || '🎯';
+        const selectedColor = EL.goalColorPicker.querySelector('.color-opt.selected')?.dataset.color || '#6366f1';
+        const notes = EL.goalNotes.value.trim();
+
+        const body = {
+            title,
+            goal_type: goalType,
+            target_amount: targetAmount,
+            current_amount: currentAmount,
+            year,
+            icon: selectedIcon,
+            color: selectedColor,
+            notes: notes
+        };
+
+        try {
+            let response;
+            if (id) {
+                response = await fetch(`/api/goals/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+            } else {
+                response = await fetch('/api/goals', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+            }
+            const result = await response.json();
+            if (result.success) {
+                closeGoalModal();
+                fetchGoals(year);
+                showToast(id ? 'Đã cập nhật mục tiêu!' : 'Đã thêm mục tiêu mới!', 'success');
+            } else {
+                showToast(result.error || 'Lỗi khi lưu mục tiêu', 'error');
+            }
+        } catch (err) {
+            console.error('Save goal error:', err);
+            showToast('Lỗi kết nối', 'error');
+        }
+    }
+
+    async function deleteGoalFromModal() {
+        const id = EL.goalId.value;
+        if (!id) return;
+        if (!confirm('Bạn có chắc muốn xóa mục tiêu này?')) return;
+
+        try {
+            const response = await fetch(`/api/goals/${id}`, { method: 'DELETE' });
+            const result = await response.json();
+            if (result.success) {
+                closeGoalModal();
+                const year = EL.goalYearSelector ? parseInt(EL.goalYearSelector.value) : new Date().getFullYear();
+                fetchGoals(year);
+                showToast('Đã xóa mục tiêu', 'success');
+            } else {
+                showToast(result.error || 'Lỗi khi xóa', 'error');
+            }
+        } catch (err) {
+            console.error('Delete goal error:', err);
+            showToast('Lỗi kết nối', 'error');
+        }
+    }
+    // Expose globally for onclick
+    window.deleteGoalFromModal = deleteGoalFromModal;
+
+    // Icon picker interaction
+    if (EL.goalIconPicker) {
+        EL.goalIconPicker.addEventListener('click', (e) => {
+            const btn = e.target.closest('.icon-opt');
+            if (!btn) return;
+            EL.goalIconPicker.querySelectorAll('.icon-opt').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+        });
+    }
+
+    // Color picker interaction
+    if (EL.goalColorPicker) {
+        EL.goalColorPicker.addEventListener('click', (e) => {
+            const btn = e.target.closest('.color-opt');
+            if (!btn) return;
+            EL.goalColorPicker.querySelectorAll('.color-opt').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+        });
+    }
+
+    // Goal form submit
+    if (EL.goalForm) {
+        EL.goalForm.addEventListener('submit', saveGoal);
+    }
+
+    // Goal type change to update UI
+    if (EL.goalType) {
+        EL.goalType.addEventListener('change', () => {
+            const val = EL.goalType.value;
+            const isAuto = ['savings', 'income', 'expense_limit'].includes(val);
+            const isCustom = (val === 'custom');
+
+            EL.goalCurrent.disabled = isAuto;
+
+            // Labels
+            const targetLabel = EL.goalTarget.parentElement.querySelector('label');
+            const currentLabel = EL.goalCurrent.parentElement.querySelector('label');
+
+            if (isAuto) {
+                EL.goalCurrent.placeholder = "Tự động tính toán từ giao dịch...";
+                if (currentLabel) currentLabel.innerHTML = 'Số tiền hiện tại <span style="font-size: 0.75rem; color: var(--primary); font-weight: 700;">(TỰ ĐỘNG)</span>';
+                if (targetLabel) targetLabel.textContent = 'Mục tiêu (số tiền)';
+                EL.goalTarget.placeholder = "VD: 100tr";
+            } else if (isCustom) {
+                EL.goalCurrent.placeholder = "VD: 50 (%)";
+                if (currentLabel) currentLabel.textContent = 'Tiến độ hiện tại (%)';
+                if (targetLabel) targetLabel.textContent = 'Mục tiêu (%)';
+                EL.goalTarget.placeholder = "Mặc định: 100 (%)";
+            } else {
+                EL.goalCurrent.placeholder = "0";
+                if (currentLabel) currentLabel.textContent = 'Số tiền hiện tại';
+                if (targetLabel) targetLabel.textContent = 'Mục tiêu (số tiền)';
+                EL.goalTarget.placeholder = "VD: 100tr";
+            }
+        });
+    }
+
+    // Nav Scroll
+    if (EL.goalPrevBtn && EL.goalsTrack) {
+        EL.goalPrevBtn.addEventListener('click', () => {
+            EL.goalsTrack.scrollBy({ left: -300, behavior: 'smooth' });
+        });
+    }
+    if (EL.goalNextBtn && EL.goalsTrack) {
+        EL.goalNextBtn.addEventListener('click', () => {
+            EL.goalsTrack.scrollBy({ left: 300, behavior: 'smooth' });
+        });
+    }
+
+    // Nav Scroll
+    if (EL.goalPrevBtn && EL.goalsTrack) {
+        EL.goalPrevBtn.addEventListener('click', () => {
+            EL.goalsTrack.scrollBy({ left: -300, behavior: 'smooth' });
+        });
+    }
+    if (EL.goalNextBtn && EL.goalsTrack) {
+        EL.goalNextBtn.addEventListener('click', () => {
+            EL.goalsTrack.scrollBy({ left: 300, behavior: 'smooth' });
+        });
+    }
+
+    // Add Goal button
+    if (EL.addGoalBtn) {
+        EL.addGoalBtn.addEventListener('click', () => openGoalModal(null));
+    }
+
+    // Close modal on outside click
+    if (EL.goalModal) {
+        EL.goalModal.addEventListener('click', (e) => {
+            if (e.target === EL.goalModal) closeGoalModal();
+        });
+    }
+
+    // Init goals on page load
+    initGoalYearSelector();
+    fetchGoals(new Date().getFullYear());
 
 });

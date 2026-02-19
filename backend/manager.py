@@ -249,6 +249,18 @@ class FinanceManager:
                 
         return assets
 
+    def get_goals(self, year):
+        """Get all goals for a year with real-time calculated progress for auto-types."""
+        goals = self.storage.get_goals(year)
+        
+        # Overlay calculated progress for specific goal types
+        for goal in goals:
+            calc_val = self.storage.get_goal_calculation(goal['goal_type'], year)
+            if calc_val is not None:
+                goal['current_amount'] = calc_val
+                
+        return goals
+
     def check_recurring_contributions(self, real_current_month):
         """
         Check and process auto-contributions for the given month (YYYY-MM).
@@ -266,6 +278,7 @@ class FinanceManager:
                     print(f"Processing recurring contribution for {asset['name']} in {real_current_month}")
                     
                     # 1. Add Transaction (Linked to asset)
+                    # NOTE: add_transaction() already updates asset balance when asset_id is provided
                     self.add_transaction(
                         amount=asset['auto_contribution'],
                         category="Savings",
@@ -275,9 +288,10 @@ class FinanceManager:
                         asset_id=asset['id']
                     )
                     
-                    # 2. Update Asset
-                    new_amount = asset['amount'] + asset['auto_contribution']
-                    self.storage.update_asset_balance(asset['id'], new_amount, real_current_month)
+                    # 2. Update last_updated_month only (balance already updated by add_transaction)
+                    updated_asset = next((a for a in self.storage.get_assets() if a['id'] == asset['id']), None)
+                    if updated_asset:
+                        self.storage.update_asset_balance(asset['id'], updated_asset['amount'], real_current_month)
                     any_processed = True
         return any_processed
 

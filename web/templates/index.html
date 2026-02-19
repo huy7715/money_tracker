@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Money Tracker</title>
+    <title>Quản Lý Chi Tiêu</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap"
         rel="stylesheet">
@@ -14,35 +14,36 @@
 </head>
 
 <body>
+    <div id="cursor-glow"></div>
     <div class="app-layout">
         <!-- Left Sidebar: Stats & Info -->
         <aside class="sidebar left-sidebar" style="animation-delay: 0.1s;">
             <div class="sidebar-header">
-                <h3>📊 Quick Stats</h3>
+                <h3>📊 Tổng Quan</h3>
             </div>
             <div class="stats-container">
                 <div class="stat-item">
-                    <span>This Month</span>
+                    <span>Chi tháng này</span>
                     <strong id="month-spent-stat">0 ₫</strong>
                 </div>
                 <div class="stat-item">
-                    <span>Total Revenue</span>
+                    <span>Tổng thu</span>
                     <strong id="total-income-stat" style="color: #10b981;">0 ₫</strong>
                 </div>
                 <div class="stat-item">
-                    <span>Total Spending</span>
+                    <span>Tổng chi</span>
                     <strong id="total-expense-stat" style="color: #ef4444;">0 ₫</strong>
                 </div>
                 <div class="stat-item">
-                    <span>Transactions</span>
+                    <span>Giao dịch</span>
                     <strong id="tx-count-stat">0</strong>
                 </div>
             </div>
             <div class="quick-links" style="margin-top: 2rem;">
-                <h3>🔗 Quick Links</h3>
-                <a href="/reports" class="sidebar-link">Monthly Reports</a>
-                <a href="/export" class="sidebar-link">Export Data</a>
-                <a href="/api/backup" class="sidebar-link" target="_blank">Backup Data</a>
+                <h3>🔗 Liên Kết</h3>
+                <a href="/reports" class="sidebar-link">Báo Cáo Tháng</a>
+                <a href="/export" class="sidebar-link">Xuất Dữ Liệu</a>
+                <a href="/api/backup" class="sidebar-link" target="_blank">Sao Lưu</a>
                 <a href="/ag-quota" class="sidebar-link" style="color: #10b981; font-weight: 600;">Quota Dashboard</a>
             </div>
         </aside>
@@ -50,13 +51,13 @@
         <!-- Center: Main Content -->
         <div class="container">
             <header style="position: relative;">
-                <h1>Money Tracker</h1>
+                <h1>Quản Lý Chi Tiêu</h1>
                 <div style="position: absolute; top: 0; right: 0; display: flex; gap: 0.5rem;">
-                    <button id="reset-bg-btn" title="Reset Background"
+                    <button id="reset-bg-btn" title="Đặt lại nền" aria-label="Đặt lại hình nền"
                         style="background: rgba(255,255,255,0.3); width: 40px; height: 40px; border-radius: 50%; padding: 0; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); color: #ef4444; border: none; cursor: pointer;">
                         ✕
                     </button>
-                    <button id="bg-btn" title="Change Background"
+                    <button id="bg-btn" title="Đổi hình nền" aria-label="Đổi hình nền"
                         style="background: rgba(255,255,255,0.3); width: 40px; height: 40px; border-radius: 50%; padding: 0; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); border: none; cursor: pointer;">
                         🎨
                     </button>
@@ -65,7 +66,7 @@
                 <div class="balance-card">
                     <div
                         style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                        <h2 style="margin: 0; font-size: 1.1rem; opacity: 0.9;">Monthly Balance</h2>
+                        <h2 style="margin: 0; font-size: 1.1rem; opacity: 0.9;">Số dư tháng</h2>
                         <select id="month-selector" class="month-selector">
                             <!-- Populated by JS -->
                         </select>
@@ -74,15 +75,61 @@
                 </div>
             </header>
 
+            <!-- Goals Showcase Banner -->
+            <section class="goals-showcase" id="goals-showcase">
+                <div class="goals-header">
+                    <div class="goals-title-row">
+                        <h3 style="margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                            <span class="goals-title-icon">🎯</span> Mục Tiêu Năm
+                        </h3>
+                        <div class="goals-header-actions">
+                            <select id="goal-year-selector" class="goal-year-pill">
+                                <!-- Populated by JS -->
+                            </select>
+                            <button id="add-goal-btn" class="goal-add-btn" title="Thêm mục tiêu">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- New Summary Row -->
+                <div class="goals-summary-row" id="goals-summary">
+                    <div class="summary-stat">
+                        <span class="summary-stat-label">Hoàn thành</span>
+                        <span class="summary-stat-value" id="goals-completed-stat">0/0</span>
+                    </div>
+                    <div class="summary-progress-bar">
+                        <div class="summary-progress-fill" id="goals-total-progress"></div>
+                    </div>
+                    <div class="summary-stat" style="text-align: right;">
+                        <span class="summary-stat-label">Tổng tiến độ</span>
+                        <span class="summary-stat-value" id="goals-percent-stat">0%</span>
+                    </div>
+                </div>
+
+                <div class="goals-track-container">
+                    <button class="goal-nav-btn prev" id="goal-prev-btn"><i class="fas fa-chevron-left"></i></button>
+                    <div id="goals-track" class="goals-track">
+                        <!-- Goal cards injected by JS -->
+                        <div id="goals-empty" class="goals-empty-state">
+                            <span class="goals-empty-icon">🏔️</span>
+                            <span>Chưa có mục tiêu nào. Hãy đặt mục tiêu đầu tiên!</span>
+                        </div>
+                    </div>
+                    <button class="goal-nav-btn next" id="goal-next-btn"><i class="fas fa-chevron-right"></i></button>
+                </div>
+            </section>
+
             <main>
                 <!-- Chart Section -->
                 <section class="chart-section">
                     <div
                         style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                        <h3 style="margin: 0;">Expense Breakdown</h3>
+                        <h3 style="margin: 0;">Phân tích chi tiêu</h3>
                         <a href="/reports"
                             style="text-decoration: none; background: var(--primary); color: white; padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.875rem; font-weight: 500; transition: all 0.2s;">📊
-                            Monthly Reports</a>
+                            Báo cáo tháng</a>
                     </div>
                     <div class="chart-container" style="position: relative; height:300px; width:100%">
                         <canvas id="expenseChart"></canvas>
@@ -93,9 +140,9 @@
                 <section class="budget-manager-section">
                     <div
                         style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                        <h3 style="margin: 0;">💰 Budget Manager</h3>
+                        <h3 style="margin: 0;">💰 Quản Lý Ngân Sách</h3>
                     </div>
-                    <p style="margin-bottom: 1rem; opacity: 0.9;">Set monthly spending limits for each category</p>
+                    <p style="margin-bottom: 1rem; opacity: 0.9;">Đặt giới hạn chi tiêu hàng tháng cho từng danh mục</p>
 
                     <!-- Budget Form - Dynamic Grid Style -->
                     <div class="budget-form-wrapper"
@@ -104,24 +151,24 @@
                             style="display: grid; grid-template-columns: 140px 1fr auto; gap: 0.5rem; align-items: stretch; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);">
                             <select id="budget-category" class="budget-select"
                                 style="padding: 0.8rem; border-radius: 0.75rem; border: none; outline: none; font-size: 0.95rem; color: #1f2937; background: white; transition: all 0.4s ease; cursor: pointer; width: 100%;">
-                                <option value="">Category</option>
-                                <option value="Food">🍔 Food & Drink</option>
-                                <option value="Rent">🏠 Rent / Housing</option>
-                                <option value="Utilities">💡 Utilities</option>
-                                <option value="Transport">🚗 Transportation</option>
-                                <option value="Groceries">🛒 Groceries</option>
-                                <option value="Shopping">🛍️ Shopping</option>
-                                <option value="Entertainment">🎮 Entertainment</option>
-                                <option value="Travel">✈️ Travel</option>
-                                <option value="Health">💪 Health & Fitness</option>
-                                <option value="Other">📦 Other</option>
+                                <option value="">Danh mục</option>
+                                <option value="Food">🍔 Ăn uống</option>
+                                <option value="Rent">🏠 Nhà ở</option>
+                                <option value="Utilities">💡 Tiện ích</option>
+                                <option value="Transport">🚗 Di chuyển</option>
+                                <option value="Groceries">🛒 Tạp hóa</option>
+                                <option value="Shopping">🛍️ Mua sắm</option>
+                                <option value="Entertainment">🎮 Giải trí</option>
+                                <option value="Travel">✈️ Du lịch</option>
+                                <option value="Health">💪 Sức khỏe</option>
+                                <option value="Other">📦 Khác</option>
                             </select>
                             <input type="text" id="budget-limit" class="budget-input"
-                                placeholder="Limit (e.g. 20k or 350)" autocomplete="off"
+                                placeholder="Giới hạn (VD: 20k hoặc 350)" autocomplete="off"
                                 style="padding: 0.8rem; border-radius: 0.75rem; border: none; outline: none; font-size: 1rem; color: #1f2937; background: white; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); width: 100%;">
                             <button id="set-budget-btn" class="budget-btn"
                                 style="background: white; color: #10b981; border: none; padding: 0 1.5rem; border-radius: 0.75rem; font-weight: 700; cursor: pointer; font-size: 1rem; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); display: flex; align-items: center; justify-content: center; white-space: nowrap; height: 100%;">
-                                <span class="btn-text">Set Budget</span>
+                                <span class="btn-text">Đặt ngân sách</span>
                                 <span class="btn-icon">💰</span>
                             </button>
                         </div>
@@ -138,21 +185,22 @@
                 <!-- Assets Overview Section -->
                 <section class="assets-overview bg-gradient-blue shadow-lg rounded-xl mb-6 delay-400 text-white p-6">
                     <div class="section-header">
-                        <h3 class="section-title">🗃️ My Assets & Savings</h3>
-                        <button onclick="openAssetModal()" class="fab" title="Add New Asset">
+                        <h3 class="section-title">🗃️ Tài Sản & Tiết Kiệm</h3>
+                        <button onclick="openAssetModal()" class="fab" title="Thêm tài sản"
+                            aria-label="Thêm tài sản mới">
                             <i class="fas fa-plus"></i>
                         </button>
                     </div>
 
                     <div id="assets-loading" class="text-center text-white-90 text-sm">
-                        Loading assets...
+                        Đang tải tài sản...
                     </div>
 
                     <div id="assets-content" style="display: none;">
                         <!-- Liquid Assets -->
                         <div class="mb-6">
                             <h4 class="asset-type-header uppercase tracking-wider opacity-90 text-sm mb-2">
-                                Liquid Assets</h4>
+                                Tài sản thanh khoản</h4>
                             <div id="liquid-assets-list" class="asset-grid">
                                 <!-- Liquid assets injected here -->
                             </div>
@@ -161,7 +209,7 @@
                         <!-- Savings -->
                         <div>
                             <h4 class="asset-type-header uppercase tracking-wider opacity-90 text-sm mb-2">
-                                Savings</h4>
+                                Tiết kiệm & Đầu tư</h4>
                             <div id="savings-assets-list" class="asset-grid">
                                 <!-- Savings assets injected here -->
                             </div>
@@ -172,7 +220,7 @@
                 <section class="ai-assistant-section">
                     <div
                         style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                        <h3 style="margin: 0;">✨ Magic Assistant</h3>
+                        <h3 style="margin: 0;">✨ Trợ Lý AI</h3>
                         <div style="display: flex; align-items: center; gap: 0.8rem;">
                             <button id="bulk-ai-btn" title="Bulk Import from Text"
                                 style="background: rgba(255,255,255,0.2); color: white; border: none; border-radius: 0.5rem; padding: 0.4rem 0.8rem; font-size: 0.75rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.3rem;">
@@ -187,17 +235,18 @@
                             </div>
                         </div>
                     </div>
-                    <p style="margin-bottom: 1rem; opacity: 0.9;">"Spent 50k on coffee", "Salary 20m", or "Set food
-                        budget
-                        to 5m"</p>
+                    <p style="margin-bottom: 1rem; opacity: 0.9;">"Chi 50k cà phê", "Lương 20 triệu", hoặc "Đặt ngân
+                        sách
+                        ăn uống 5 triệu"</p>
                     <div class="ai-container" style="display: flex; gap: 0.5rem; align-items: stretch;">
-                        <input type="text" id="ai-input" placeholder="Type or use 🎤 voice..." autocomplete="off">
-                        <button id="voice-btn" title="Voice Input"
+                        <input type="text" id="ai-input" placeholder="Nhập hoặc dùng 🎤 giọng nói..."
+                            autocomplete="off">
+                        <button id="voice-btn" title="Nhập bằng giọng nói" aria-label="Nhập bằng giọng nói"
                             style="background: rgba(255,255,255,0.2); border: 2px solid rgba(255,255,255,0.3); border-radius: 0.75rem; padding: 0 1rem; cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; justify-content: center;">
                             <span id="voice-icon" style="font-size: 1.3rem;">🎤</span>
                         </button>
                         <button id="ai-btn">
-                            <span class="btn-text">Ask AI</span>
+                            <span class="btn-text">Hỏi AI</span>
                             <span class="btn-icon">✨</span>
                         </button>
                         <div id="ai-loading">
@@ -213,73 +262,74 @@
 
 
                 <section class="add-transaction">
-                    <h3>Add Transaction</h3>
+                    <h3>Thêm Giao Dịch</h3>
                     <form id="transaction-form">
                         <div class="form-group">
-                            <label for="amount">Amount (in thousand ₫)</label>
-                            <input type="text" id="amount" required placeholder="e.g. 100 (= 100.000 ₫)"
+                            <label for="amount">Số tiền (đơn vị nghìn ₫)</label>
+                            <input type="text" id="amount" required placeholder="VD: 100 (= 100.000 ₫)"
                                 autocomplete="off">
                         </div>
 
                         <div class="form-group">
-                            <label for="category">Category</label>
+                            <label for="category">Danh mục</label>
                             <select id="category" required>
-                                <option value="" disabled selected>Select category</option>
-                                <optgroup label="Essential Expenses">
-                                    <option value="Food">Food & Drink</option>
-                                    <option value="Rent">Rent / Housing</option>
-                                    <option value="Utilities">Utilities (Electricity/Water)</option>
-                                    <option value="Transport">Transportation</option>
-                                    <option value="Groceries">Groceries</option>
+                                <option value="" disabled selected>Chọn danh mục</option>
+                                <optgroup label="Chi phí thiết yếu">
+                                    <option value="Food">Ăn uống</option>
+                                    <option value="Rent">Nhà ở</option>
+                                    <option value="Utilities">Tiện ích (Điện/Nước)</option>
+                                    <option value="Transport">Di chuyển</option>
+                                    <option value="Groceries">Tạp hóa</option>
                                 </optgroup>
-                                <optgroup label="Lifestyle">
-                                    <option value="Shopping">Shopping</option>
-                                    <option value="Entertainment">Entertainment</option>
-                                    <option value="Travel">Travel</option>
-                                    <option value="Health">Health & Fitness</option>
+                                <optgroup label="Phong cách sống">
+                                    <option value="Shopping">Mua sắm</option>
+                                    <option value="Entertainment">Giải trí</option>
+                                    <option value="Travel">Du lịch</option>
+                                    <option value="Health">Sức khỏe</option>
                                 </optgroup>
-                                <optgroup label="Income">
-                                    <option value="Salary">Salary</option>
-                                    <option value="Bonus">Bonus</option>
-                                    <option value="Investment">Investment</option>
-                                    <option value="Other Income">Other Income</option>
+                                <optgroup label="Thu nhập">
+                                    <option value="Salary">Lương</option>
+                                    <option value="Bonus">Thưởng</option>
+                                    <option value="Investment">Đầu tư</option>
+                                    <option value="Other Income">Thu nhập khác</option>
                                 </optgroup>
-                                <option value="Other">Other Expense</option>
+                                <option value="Savings">🏦 Tiết kiệm</option>
+                                <option value="Other">Chi phí khác</option>
                             </select>
                         </div>
                         <div class="form-group">
-                            <label for="type">Type</label>
+                            <label for="type">Loại</label>
                             <select id="type">
-                                <option value="expense">Expense</option>
-                                <option value="income">Income</option>
+                                <option value="expense">Chi tiêu</option>
+                                <option value="income">Thu nhập</option>
                             </select>
                         </div>
                         <div class="form-group" id="payment-source-group">
-                            <label for="transaction-asset">Payment Source (Optional)</label>
+                            <label for="transaction-asset">Nguồn thanh toán (Tùy chọn)</label>
                             <select id="transaction-asset">
-                                <option value="">None (Just track)</option>
+                                <option value="">Không (Chỉ ghi nhận)</option>
                                 <!-- Populated by JS -->
                             </select>
                         </div>
                         <div class="form-group">
-                            <label for="description">Description (Optional)</label>
-                            <input type="text" id="description" placeholder="Short description">
+                            <label for="description">Mô tả (Tùy chọn)</label>
+                            <input type="text" id="description" placeholder="Mô tả ngắn">
                         </div>
                         <div class="form-group">
-                            <label for="date">Date</label>
+                            <label for="date">Ngày</label>
                             <input type="datetime-local" id="date">
                         </div>
-                        <button type="submit">Add Transaction</button>
+                        <button type="submit">Thêm giao dịch</button>
                     </form>
                 </section>
 
                 <section class="recent-transactions">
                     <div
                         style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                        <h3 style="margin-bottom: 0;">Recent Transactions</h3>
+                        <h3 style="margin-bottom: 0;">Giao Dịch Gần Đây</h3>
                         <a href="/export" class="export-btn"
-                            style="text-decoration: none; background-color: #10b981; color: white; padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.875rem; font-weight: 500;">Export
-                            to Excel</a>
+                            style="text-decoration: none; background-color: #10b981; color: white; padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.875rem; font-weight: 500;">Xuất
+                            Excel</a>
                     </div>
                     <ul id="transaction-list">
                         {% for transaction in transactions %}
@@ -300,10 +350,10 @@
                                         data-category="{{ transaction.category }}" data-type="{{ transaction.type }}"
                                         data-description="{{ transaction.description or '' }}"
                                         data-date="{{ transaction.date }}">
-                                        <i class="fas fa-edit"></i> Edit
+                                        <i class="fas fa-edit"></i> Sửa
                                     </button>
                                     <button class="delete-btn" data-id="{{ transaction.id }}">
-                                        <i class="fas fa-trash"></i> Delete
+                                        <i class="fas fa-trash"></i> Xóa
                                     </button>
                                 </div>
                             </div>
@@ -317,12 +367,12 @@
         <!-- Right Sidebar: Daily Journal -->
         <aside class="sidebar right-sidebar" style="animation-delay: 0.6s;">
             <div class="sidebar-header">
-                <h3>📝 Daily Journal</h3>
+                <h3>📝 Nhật Ký</h3>
                 <input type="date" id="diary-date"
                     style="padding: 0.3rem; font-size: 0.8rem; border-radius: 0.4rem; border: 1px solid #ddd; margin-top: 0.5rem; width: 100%;">
             </div>
             <div class="diary-container">
-                <input type="text" id="diary-title" placeholder="Note Title (Optional)"
+                <input type="text" id="diary-title" placeholder="Tiêu đề ghi chú (Tùy chọn)"
                     style="width: 100%; padding: 0.8rem; border-radius: 0.75rem; border: 1px solid var(--glass-border); font-family: inherit; font-size: 0.95rem; margin-bottom: 0.5rem; background: rgba(255,255,255,0.8); font-weight: 600;">
                 <div class="diary-toolbar">
                     <button type="button" onclick="formatDoc('bold')" title="Bold"><b>B</b></button>
@@ -333,24 +383,24 @@
                             class="fas fa-check-square"></i></button>
                     <input type="color" id="diary-color-picker" title="Text Color" style="margin-left: 5px;">
                 </div>
-                <div id="diary-content" class="rich-editor" contenteditable="true"
-                    data-placeholder="Share your thoughts for today..."></div>
-                <button id="save-diary-btn" style="background: var(--income); margin-bottom: 1.5rem;">Save
-                    Note</button>
+                <div id="diary-content" class="rich-editor" contenteditable="true" role="textbox"
+                    aria-label="Nội dung nhật ký" data-placeholder="Chia sẻ suy nghĩ hôm nay..."></div>
+                <button id="save-diary-btn" style="background: var(--income); margin-bottom: 1.5rem;">Lưu
+                    ghi chú</button>
 
                 <div class="diary-history">
                     <h4
                         style="font-size: 0.85rem; color: #6b7280; margin-bottom: 0.8rem; display: flex; align-items: center; gap: 0.4rem;">
-                        📅 Recent Notes
+                        📅 Ghi chú gần đây
                     </h4>
                     <div
                         style="display: flex; flex-direction: column; gap: 0.5rem; flex: 1; min-height: 0; overflow: hidden;">
-                        <input type="text" id="note-search" placeholder="Search notes (e.g. 2026-01)..."
+                        <input type="text" id="note-search" placeholder="Tìm ghi chú (VD: 2026-01)..."
                             style="width: 100%; padding: 0.5rem; font-size: 0.8rem; border-radius: 0.4rem; border: 1px solid #e5e7eb; margin-bottom: 0.5rem; background: rgba(255,255,255,0.8);">
                         <div id="diary-history-list-container" class="scrollable-history">
                             <div id="diary-history-list" style="display: flex; flex-direction: column; gap: 0.5rem;">
                                 <!-- History items will be injected here -->
-                                <p style="font-size: 0.75rem; color: #9ca3af; text-align: center;">No notes recorded yet
+                                <p style="font-size: 0.75rem; color: #9ca3af; text-align: center;">Chưa có ghi chú nào
                                 </p>
                             </div>
                         </div>
@@ -362,82 +412,81 @@
     <!-- Edit Modal -->
     <div id="edit-modal" class="modal">
         <div class="modal-content">
-            <span class="close-btn" onclick="closeModal()">&times;</span>
-            <h3>Edit Transaction</h3>
+            <span class="close-btn" onclick="closeModal()" aria-label="Đóng">&times;</span>
+            <h3>Sửa Giao Dịch</h3>
             <form id="edit-form">
                 <input type="hidden" id="edit-id">
                 <div class="form-group">
-                    <label for="edit-amount">Amount (in thousand ₫)</label>
+                    <label for="edit-amount">Số tiền (đơn vị nghìn ₫)</label>
                     <input type="text" id="edit-amount" required placeholder="0" autocomplete="off">
                 </div>
                 <div class="form-group">
-                    <label for="edit-category">Category</label>
+                    <label for="edit-category">Danh mục</label>
                     <select id="edit-category" required>
-                        <option value="" disabled selected>Select category</option>
-                        <optgroup label="Essential Expenses">
-                            <option value="Food">Food & Drink</option>
-                            <option value="Rent">Rent / Housing</option>
-                            <option value="Utilities">Utilities (Electricity/Water)</option>
-                            <option value="Transport">Transportation</option>
-                            <option value="Groceries">Groceries</option>
+                        <option value="" disabled selected>Chọn danh mục</option>
+                        <optgroup label="Chi phí thiết yếu">
+                            <option value="Food">Ăn uống</option>
+                            <option value="Rent">Nhà ở</option>
+                            <option value="Utilities">Tiện ích (Điện/Nước)</option>
+                            <option value="Transport">Di chuyển</option>
+                            <option value="Groceries">Tạp hóa</option>
                         </optgroup>
-                        <optgroup label="Lifestyle">
-                            <option value="Shopping">Shopping</option>
-                            <option value="Entertainment">Entertainment</option>
-                            <option value="Travel">Travel</option>
-                            <option value="Health">Health & Fitness</option>
+                        <optgroup label="Phong cách sống">
+                            <option value="Shopping">Mua sắm</option>
+                            <option value="Entertainment">Giải trí</option>
+                            <option value="Travel">Du lịch</option>
+                            <option value="Health">Sức khỏe</option>
                         </optgroup>
-                        <optgroup label="Income">
-                            <option value="Salary">Salary</option>
-                            <option value="Bonus">Bonus</option>
-                            <option value="Investment">Investment</option>
-                            <option value="Other Income">Other Income</option>
+                        <optgroup label="Thu nhập">
+                            <option value="Salary">Lương</option>
+                            <option value="Bonus">Thưởng</option>
+                            <option value="Investment">Đầu tư</option>
+                            <option value="Other Income">Thu nhập khác</option>
                         </optgroup>
-                        <option value="Other">Other Expense</option>
+                        <option value="Other">Chi phí khác</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="edit-type">Type</label>
+                    <label for="edit-type">Loại</label>
                     <select id="edit-type">
-                        <option value="expense">Expense</option>
-                        <option value="income">Income</option>
+                        <option value="expense">Chi tiêu</option>
+                        <option value="income">Thu nhập</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="edit-description">Description</label>
+                    <label for="edit-description">Mô tả</label>
                     <input type="text" id="edit-description">
                 </div>
                 <div class="form-group">
-                    <label for="edit-date">Date</label>
+                    <label for="edit-date">Ngày</label>
                     <input type="datetime-local" id="edit-date" required>
                 </div>
-                <button type="submit">Save Changes</button>
+                <button type="submit">Lưu thay đổi</button>
             </form>
         </div>
     </div>
     <!-- Bulk Import Modal -->
     <div id="bulk-modal" class="modal">
         <div class="modal-content" style="max-width: 800px;">
-            <span class="close-btn" onclick="closeBulkModal()">&times;</span>
-            <h3 style="display: flex; align-items: center; gap: 0.5rem;">✨ AI Bulk Transaction Extraction</h3>
+            <span class="close-btn" onclick="closeBulkModal()" aria-label="Đóng">&times;</span>
+            <h3 style="display: flex; align-items: center; gap: 0.5rem;">✨ AI Nhập Hàng Loạt</h3>
 
             <div id="bulk-input-step">
                 <p style="font-size: 0.9rem; color: #64748b; margin-bottom: 1rem;">
-                    Paste your diary, notes, or chat history below. AI will automatically find all transactions and
-                    dates.
+                    Dán nhật ký, ghi chú, hoặc lịch sử chat ở bên dưới. AI sẽ tự động tìm tất cả giao dịch.
                 </p>
-                <textarea id="bulk-text-input" placeholder="Example:
-12/1/2025: Spent 50k on lunch. 
-15/1/2025: Received salary 20m..."
+                <textarea id="bulk-text-input" placeholder="Ví dụ:
+12/1/2025: Chi 50k ăn trưa. 
+15/1/2025: Nhận lương 20 triệu..."
                     style="width: 100%; height: 300px; padding: 1rem; border: 1px solid #e2e8f0; border-radius: 0.75rem; font-family: 'IBM Plex Sans', sans-serif; font-size: 0.95rem; margin-bottom: 1rem; outline: none; transition: border-color 0.2s;"></textarea>
                 <button id="bulk-extract-btn" style="background: var(--accent); font-weight: 700;">
-                    Scan Text with AI ✨
+                    Quét bằng AI ✨
                 </button>
             </div>
 
             <div id="bulk-review-step" style="display: none;">
                 <p style="font-size: 0.9rem; color: #64748b; margin-bottom: 1rem;">
-                    Review the detected transactions. Uncheck any you don't want to import.
+                    Kiểm tra các giao dịch được phát hiện. Bỏ chọn những giao dịch không muốn nhập.
                 </p>
                 <div
                     style="max-height: 400px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 0.75rem; margin-bottom: 1.5rem;">
@@ -446,14 +495,14 @@
                             <tr>
                                 <th style="padding: 0.75rem; border-bottom: 1px solid #e2e8f0; text-align: left;"><input
                                         type="checkbox" id="bulk-select-all" checked></th>
-                                <th style="padding: 0.75rem; border-bottom: 1px solid #e2e8f0; text-align: left;">Date
+                                <th style="padding: 0.75rem; border-bottom: 1px solid #e2e8f0; text-align: left;">Ngày
                                 </th>
                                 <th style="padding: 0.75rem; border-bottom: 1px solid #e2e8f0; text-align: left;">
-                                    Description</th>
+                                    Mô tả</th>
                                 <th style="padding: 0.75rem; border-bottom: 1px solid #e2e8f0; text-align: left;">
-                                    Category</th>
+                                    Danh mục</th>
                                 <th style="padding: 0.75rem; border-bottom: 1px solid #e2e8f0; text-align: right;">
-                                    Amount</th>
+                                    Số tiền</th>
                             </tr>
                         </thead>
                         <tbody id="bulk-review-table-body">
@@ -463,79 +512,161 @@
                 </div>
                 <div style="display: flex; gap: 1rem;">
                     <button onclick="backToBulkInput()"
-                        style="background: #f1f5f9; color: #475569; font-weight: 600;">Back</button>
-                    <button id="bulk-confirm-btn" style="background: #10b981; font-weight: 700;">Import <span
-                            id="bulk-count-badge">0</span> Transactions</button>
+                        style="background: #f1f5f9; color: #475569; font-weight: 600;">Quay lại</button>
+                    <button id="bulk-confirm-btn" style="background: #10b981; font-weight: 700;">Nhập <span
+                            id="bulk-count-badge">0</span> giao dịch</button>
                 </div>
             </div>
 
             <div id="bulk-loading" style="display: none; text-align: center; padding: 3rem 0;">
                 <div style="animation: spin 1s linear infinite; font-size: 3rem; margin-bottom: 1rem;">⏳</div>
-                <p style="font-weight: 600; color: var(--primary);">AI is analyzing your notes...</p>
-                <p style="font-size: 0.8rem; color: #94a3b8;">This may take 10-20 seconds for long texts.</p>
+                <p style="font-weight: 600; color: var(--primary);">AI đang phân tích ghi chú...</p>
+                <p style="font-size: 0.8rem; color: #94a3b8;">Có thể mất 10-20 giây cho văn bản dài.</p>
             </div>
         </div>
     </div>
     <!-- Asset Management Modal -->
     <div id="asset-modal" class="modal">
         <div class="modal-content">
-            <span class="close-btn" onclick="closeAssetModal()">&times;</span>
+            <span class="close-btn" onclick="closeAssetModal()" aria-label="Đóng">&times;</span>
             <div class="modal-header">
-                <h3 id="asset-modal-title">Add New Asset</h3>
+                <h3 id="asset-modal-title">Thêm Tài Sản</h3>
             </div>
             <form id="asset-form">
                 <input type="hidden" id="asset-id">
                 <div class="form-group">
-                    <label for="asset-name">Asset Name</label>
-                    <input type="text" id="asset-name" required placeholder="e.g. Secret Stash" autocomplete="off">
+                    <label for="asset-name">Tên tài sản</label>
+                    <input type="text" id="asset-name" required placeholder="VD: Quỹ dự phòng" autocomplete="off">
                 </div>
                 <div class="form-group">
-                    <label for="asset-type">Type</label>
+                    <label for="asset-type">Loại</label>
                     <select id="asset-type" required>
-                        <option value="Cash">Cash</option>
-                        <option value="Bank">Bank Account</option>
-                        <option value="Savings">Savings</option>
-                        <option value="Cumulative">Cumulative Fund</option>
-                        <option value="Stock">Stock / Investment</option>
+                        <option value="Cash">Tiền mặt</option>
+                        <option value="Bank">Tài khoản ngân hàng</option>
+                        <option value="Savings">Tiết kiệm</option>
+                        <option value="Cumulative">Quỹ tích lũy</option>
+                        <option value="Stock">Cổ phiếu / Đầu tư</option>
                         <option value="Crypto">Crypto</option>
-                        <option value="Real Estate">Real Estate</option>
-                        <option value="Gold">Gold</option>
-                        <option value="Other">Other</option>
+                        <option value="Real Estate">Bất động sản</option>
+                        <option value="Gold">Vàng</option>
+                        <option value="Other">Khác</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="asset-amount">Current Balance</label>
+                    <label for="asset-amount">Số dư hiện tại</label>
                     <input type="text" id="asset-amount" required placeholder="0" autocomplete="off">
                 </div>
 
-                <!-- Advanced Fields (Collapsible or just always visible for now) -->
+                <!-- Advanced Fields -->
                 <div style="margin-top: 1rem; border-top: 1px dashed #e5e7eb; padding-top: 1rem;">
-                    <h4 style="font-size: 0.9rem; margin-bottom: 0.5rem; color: var(--text-secondary);">Using for
-                        Savings/Investment?</h4>
+                    <h4 style="font-size: 0.9rem; margin-bottom: 0.5rem; color: var(--text-secondary);">Dùng cho
+                        tiết kiệm/đầu tư?</h4>
                     <div class="form-group">
-                        <label for="asset-interest">Interest Rate (%/year)</label>
+                        <label for="asset-interest">Lãi suất (%/năm)</label>
                         <input type="number" id="asset-interest" step="0.01" placeholder="0">
                     </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                         <div class="form-group">
-                            <label for="asset-start-date">Start Date</label>
+                            <label for="asset-start-date">Ngày bắt đầu</label>
                             <input type="date" id="asset-start-date">
                         </div>
                         <div class="form-group">
-                            <label for="asset-end-date">End Date</label>
+                            <label for="asset-end-date">Ngày kết thúc</label>
                             <input type="date" id="asset-end-date">
                         </div>
                     </div>
                     <div class="form-group">
-                        <label for="asset-auto">Monthly Auto-Contribution</label>
+                        <label for="asset-auto">Tự động đóng góp hàng tháng</label>
                         <input type="text" id="asset-auto" placeholder="0" autocomplete="off">
                     </div>
                 </div>
 
                 <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
                     <button type="button" id="delete-asset-btn" onclick="deleteAsset()"
-                        style="background:var(--expense); display: none;">Delete</button>
-                    <button type="submit">Save Asset</button>
+                        style="background:var(--expense); display: none;">Xóa</button>
+                    <button type="submit">Lưu tài sản</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <!-- Goal Management Modal -->
+    <div id="goal-modal" class="modal">
+        <div class="modal-content" style="max-width: 480px;">
+            <span class="close-btn" onclick="closeGoalModal()" aria-label="Đóng">&times;</span>
+            <div class="modal-header">
+                <h3 id="goal-modal-title">Thêm Mục Tiêu Mới</h3>
+            </div>
+            <form id="goal-form">
+                <input type="hidden" id="goal-id">
+                <div class="form-group">
+                    <label for="goal-title">Tên mục tiêu</label>
+                    <input type="text" id="goal-title" required placeholder="VD: Tiết kiệm 100 triệu"
+                        autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label for="goal-type">Loại mục tiêu</label>
+                    <select id="goal-type" required>
+                        <option value="savings">💰 Tiết kiệm</option>
+                        <option value="income">📈 Thu nhập</option>
+                        <option value="expense_limit">📉 Giới hạn chi tiêu</option>
+                        <option value="custom">✨ Mục tiêu cá nhân</option>
+                    </select>
+                </div>
+                <div class="form-group" id="goal-target-group">
+                    <label for="goal-target">Mục tiêu (số tiền hoặc số lượng)</label>
+                    <input type="text" id="goal-target" placeholder="VD: 100tr hoặc 24" autocomplete="off">
+                </div>
+                <div class="form-group" id="goal-current-group">
+                    <label for="goal-current">Tiến độ hiện tại</label>
+                    <input type="text" id="goal-current" placeholder="0" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label>Biểu tượng</label>
+                    <div class="goal-icon-picker" id="goal-icon-picker">
+                        <button type="button" class="icon-opt selected" data-icon="🎯">🎯</button>
+                        <button type="button" class="icon-opt" data-icon="💰">💰</button>
+                        <button type="button" class="icon-opt" data-icon="🏠">🏠</button>
+                        <button type="button" class="icon-opt" data-icon="🚗">🚗</button>
+                        <button type="button" class="icon-opt" data-icon="✈️">✈️</button>
+                        <button type="button" class="icon-opt" data-icon="📚">📚</button>
+                        <button type="button" class="icon-opt" data-icon="💪">💪</button>
+                        <button type="button" class="icon-opt" data-icon="🎓">🎓</button>
+                        <button type="button" class="icon-opt" data-icon="💎">💎</button>
+                        <button type="button" class="icon-opt" data-icon="🏆">🏆</button>
+                        <button type="button" class="icon-opt" data-icon="🌟">🌟</button>
+                        <button type="button" class="icon-opt" data-icon="❤️">❤️</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Màu sắc</label>
+                    <div class="goal-color-picker" id="goal-color-picker">
+                        <button type="button" class="color-opt selected" data-color="#6366f1"
+                            style="background:#6366f1;"></button>
+                        <button type="button" class="color-opt" data-color="#10b981"
+                            style="background:#10b981;"></button>
+                        <button type="button" class="color-opt" data-color="#f59e0b"
+                            style="background:#f59e0b;"></button>
+                        <button type="button" class="color-opt" data-color="#ef4444"
+                            style="background:#ef4444;"></button>
+                        <button type="button" class="color-opt" data-color="#ec4899"
+                            style="background:#ec4899;"></button>
+                        <button type="button" class="color-opt" data-color="#8b5cf6"
+                            style="background:#8b5cf6;"></button>
+                        <button type="button" class="color-opt" data-color="#0ea5e9"
+                            style="background:#0ea5e9;"></button>
+                        <button type="button" class="color-opt" data-color="#14b8a6"
+                            style="background:#14b8a6;"></button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="goal-notes">Nhật ký tiến độ / Ghi chú</label>
+                    <textarea id="goal-notes" rows="4"
+                        placeholder="VD: Hôm nay đã học xong phần biển báo giao thông..."></textarea>
+                </div>
+                <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+                    <button type="button" id="delete-goal-btn" onclick="deleteGoalFromModal()"
+                        style="background:var(--expense); display: none;">Xóa</button>
+                    <button type="submit">Lưu mục tiêu</button>
                 </div>
             </form>
         </div>

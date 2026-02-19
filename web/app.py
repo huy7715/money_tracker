@@ -8,33 +8,61 @@ import subprocess
 import json
 from datetime import datetime
 import sys
+import threading
 
 app = Flask(__name__)
-socketio = SocketIO(app, cors_allowed_origins="*")
 
-# Determine database path: works for both dev (.py) and frozen (.exe)
-if getattr(sys, 'frozen', False):
-    # Running as PyInstaller .exe — DB sits next to the .exe
-    root_dir = os.path.dirname(sys.executable)
+# Conditional SocketIO (Disabled on Vercel/Cloud to avoid serverless errors)
+is_vercel = os.environ.get('VERCEL') == '1' or os.environ.get('DISABLE_SOCKETIO') == '1'
+if is_vercel:
+    print("App: WebSockets (SocketIO) DISABLED for Cloud/Serverless environment")
+    from flask_socketio import SocketIO
+    # Create a dummy SocketIO that doesn't attempt real connections
+    class MockSocketIO:
+        def emit(self, *args, **kwargs): pass
+        def on(self, *args, **kwargs): return lambda x: x
+        def init_app(self, app, *args, **kwargs): pass
+    socketio = MockSocketIO()
 else:
-    # Running as .py script — DB sits at project root
+    socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading' if os.name == 'nt' else 'eventlet')
+
+# Database Initialization
+# If DATABASE_URL is set, Storage will use PostgreSQL. Default to local money_tracker.db.
+db_path = 'money_tracker.db'
+if getattr(sys, 'frozen', False):
+    db_path = os.path.join(os.path.dirname(sys.executable), 'money_tracker.db')
+elif not os.environ.get('DATABASE_URL'):
+    # Local pathing if no PG URL
     root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    db_path = os.path.join(root_dir, 'money_tracker.db')
 
-manager = FinanceManager(db_path=os.path.join(root_dir, 'money_tracker.db'))
+manager = FinanceManager(db_path=db_path)
 
-# Cache for recurring contribution check to prevent race condition
+# Singleton AI Service (avoid re-creating per request)
+_ai_service = None
+def get_ai_service():
+    global _ai_service
+    if _ai_service is None:
+        from money_tracker.backend.ai_service import AIService
+        _ai_service = AIService()
+    return _ai_service
+
+# Cache for recurring contribution check with thread-safety
 _last_contribution_check = None
+_contribution_lock = threading.Lock()
 
 def check_and_process_contributions():
-    """Check and process recurring contributions only once per day"""
+    """Check and process recurring contributions only once per day (thread-safe)"""
     global _last_contribution_check
     current_date = datetime.now().strftime("%Y-%m-%d")
     
-    # Only process if we haven't checked today
     if _last_contribution_check != current_date:
-        current_month = datetime.now().strftime("%Y-%m")
-        manager.check_recurring_contributions(current_month)
-        _last_contribution_check = current_date
+        with _contribution_lock:
+            # Double-check after acquiring lock
+            if _last_contribution_check != current_date:
+                current_month = datetime.now().strftime("%Y-%m")
+                manager.check_recurring_contributions(current_month)
+                _last_contribution_check = current_date
 
 @app.route('/')
 def index():
@@ -65,17 +93,17 @@ def add_transaction():
     try:
         # Validate required fields
         if not data.get('amount') or not data.get('category') or not data.get('type'):
-            return jsonify({'success': False, 'error': 'Missing required fields'}), 400
+            return jsonify({'success': False, 'error': 'Thiếu thông tin bắt buộc'}), 400
         
         # Validate amount
         amount = float(data['amount'])
         if amount <= 0:
-            return jsonify({'success': False, 'error': 'Amount must be greater than 0'}), 400
+            return jsonify({'success': False, 'error': 'Số tiền phải lớn hơn 0'}), 400
         
         # Validate type
         tx_type = data['type']
         if tx_type not in ['income', 'expense']:
-            return jsonify({'success': False, 'error': 'Type must be "income" or "expense"'}), 400
+            return jsonify({'success': False, 'error': 'Loại phải là "income" hoặc "expense"'}), 400
         
         # Validate category
         valid_categories = ['Food', 'Rent', 'Utilities', 'Transport', 'Groceries', 'Shopping', 
@@ -83,7 +111,7 @@ def add_transaction():
                           'Other Income', 'Other', 'Savings']
         category = data['category']
         if category not in valid_categories:
-            return jsonify({'success': False, 'error': f'Invalid category: {category}'}), 400
+            return jsonify({'success': False, 'error': f'Danh mục không hợp lệ: {category}'}), 400
         
         # Validate asset_id if provided
         asset_id = data.get('asset_id')
@@ -91,7 +119,7 @@ def add_transaction():
             try:
                 asset_id = int(asset_id)
             except (ValueError, TypeError):
-                return jsonify({'success': False, 'error': 'Invalid asset_id'}), 400
+                return jsonify({'success': False, 'error': 'Mã tài sản không hợp lệ'}), 400
         else:
             asset_id = None
         
@@ -107,12 +135,12 @@ def add_transaction():
         return jsonify({'success': True}), 201
         
     except ValueError as e:
-        return jsonify({'success': False, 'error': f'Invalid data type: {str(e)}'}), 400
+        return jsonify({'success': False, 'error': f'Dữ liệu không hợp lệ: {str(e)}'}), 400
     except KeyError as e:
-        return jsonify({'success': False, 'error': f'Missing field: {str(e)}'}), 400
+        return jsonify({'success': False, 'error': f'Thiếu trường dữ liệu: {str(e)}'}), 400
     except Exception as e:
         print(f"Unexpected error in add_transaction: {type(e).__name__}: {e}")
-        return jsonify({'success': False, 'error': 'Internal server error'}), 500
+        return jsonify({'success': False, 'error': 'Lỗi máy chủ nội bộ'}), 500
 
 @app.route('/delete/<int:transaction_id>', methods=['DELETE'])
 def delete_transaction(transaction_id):
@@ -124,7 +152,7 @@ def delete_transaction(transaction_id):
         return jsonify({'success': False, 'error': str(e)}), 404
     except Exception as e:
         print(f"Unexpected error in delete_transaction: {type(e).__name__}: {e}")
-        return jsonify({'success': False, 'error': 'Internal server error'}), 500
+        return jsonify({'success': False, 'error': 'Lỗi máy chủ nội bộ'}), 500
 
 @app.route('/update/<int:transaction_id>', methods=['PUT'])
 def update_transaction(transaction_id):
@@ -134,17 +162,17 @@ def update_transaction(transaction_id):
     try:
         # Validate required fields
         if not data.get('amount') or not data.get('category') or not data.get('type') or not data.get('date'):
-            return jsonify({'success': False, 'error': 'Missing required fields'}), 400
+            return jsonify({'success': False, 'error': 'Thiếu thông tin bắt buộc'}), 400
         
         # Validate amount
         amount = float(data['amount'])
         if amount <= 0:
-            return jsonify({'success': False, 'error': 'Amount must be greater than 0'}), 400
+            return jsonify({'success': False, 'error': 'Số tiền phải lớn hơn 0'}), 400
         
         # Validate type
         tx_type = data['type']
         if tx_type not in ['income', 'expense']:
-            return jsonify({'success': False, 'error': 'Type must be "income" or "expense"'}), 400
+            return jsonify({'success': False, 'error': 'Loại phải là "income" hoặc "expense"'}), 400
         
         # Validate category
         valid_categories = ['Food', 'Rent', 'Utilities', 'Transport', 'Groceries', 'Shopping', 
@@ -152,7 +180,7 @@ def update_transaction(transaction_id):
                           'Other Income', 'Other', 'Savings']
         category = data['category']
         if category not in valid_categories:
-            return jsonify({'success': False, 'error': f'Invalid category: {category}'}), 400
+            return jsonify({'success': False, 'error': f'Danh mục không hợp lệ: {category}'}), 400
         
         manager.update_transaction(
             transaction_id=transaction_id,
@@ -166,12 +194,12 @@ def update_transaction(transaction_id):
         return jsonify({'success': True})
         
     except ValueError as e:
-        return jsonify({'success': False, 'error': f'Invalid data: {str(e)}'}), 400
+        return jsonify({'success': False, 'error': f'Dữ liệu không hợp lệ: {str(e)}'}), 400
     except KeyError as e:
-        return jsonify({'success': False, 'error': f'Missing field: {str(e)}'}), 400
+        return jsonify({'success': False, 'error': f'Thiếu trường dữ liệu: {str(e)}'}), 400
     except Exception as e:
         print(f"Unexpected error in update_transaction: {type(e).__name__}: {e}")
-        return jsonify({'success': False, 'error': 'Internal server error'}), 500
+        return jsonify({'success': False, 'error': 'Lỗi máy chủ nội bộ'}), 500
 
 @app.route('/api/data')
 def get_data():
@@ -200,7 +228,8 @@ def get_available_months():
 
 @app.route('/export')
 def export_data():
-    transactions = manager.get_recent_transactions()
+    month = request.args.get('month')  # Support filtering by month
+    transactions = manager.get_recent_transactions(month)
     
     # Generate CSV
     def generate():
@@ -232,7 +261,8 @@ def export_data():
 
     # Return as stream
     response = Response(generate(), mimetype='text/csv')
-    response.headers.set("Content-Disposition", "attachment", filename="transactions.csv")
+    filename = f"transactions_{month}.csv" if month else "transactions.csv"
+    response.headers.set("Content-Disposition", "attachment", filename=filename)
     return response
 
 @app.route('/api/magic-assistant', methods=['POST'])
@@ -240,12 +270,10 @@ def magic_assistant():
     data = request.json
     text = data.get('text')
     if not text:
-        return jsonify({'error': 'No text provided'}), 400
+        return jsonify({'error': 'Không có văn bản'}), 400
     
     try:
-        from money_tracker.backend.ai_service import AIService
-        ai_service = AIService()
-        result = ai_service.parse_magic_prompt(text)
+        result = get_ai_service().parse_magic_prompt(text)
         return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -255,12 +283,10 @@ def ai_parse():
     data = request.json
     text = data.get('text')
     if not text:
-        return jsonify({'error': 'No text provided'}), 400
+        return jsonify({'error': 'Không có văn bản'}), 400
     
     try:
-        from money_tracker.backend.ai_service import AIService
-        ai_service = AIService()
-        result = ai_service.parse_transaction(text) # Uses backward compatibility method
+        result = get_ai_service().parse_transaction(text)
         return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -270,12 +296,10 @@ def ai_bulk_extract():
     data = request.json
     text = data.get('text')
     if not text:
-        return jsonify({'error': 'No text provided'}), 400
+        return jsonify({'error': 'Không có văn bản'}), 400
     
     try:
-        from money_tracker.backend.ai_service import AIService
-        ai_service = AIService()
-        result = ai_service.extract_bulk_transactions(text)
+        result = get_ai_service().extract_bulk_transactions(text)
         return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -287,20 +311,18 @@ def switch_model():
     data = request.json
     provider = data.get('provider')
     if not provider:
-        return jsonify({'error': 'No provider specified'}), 400
+        return jsonify({'error': 'Chưa chọn nhà cung cấp'}), 400
     
     from money_tracker.backend.ai_service import AIService
     if AIService.set_provider(provider):
         return jsonify({'success': True, 'provider': AIService.get_active_provider()})
     else:
-        return jsonify({'error': 'Invalid provider'}), 400
+        return jsonify({'error': 'Nhà cung cấp không hợp lệ'}), 400
 
 @app.route('/api/ai-info')
-def get_ai_info():
+def get_ai_info_route():
     try:
-        from money_tracker.backend.ai_service import AIService
-        ai_service = AIService()
-        return jsonify(ai_service.get_model_info())
+        return jsonify(get_ai_service().get_model_info())
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -373,7 +395,7 @@ def get_diary():
     try:
         date = request.args.get('date')
         if not date:
-            return jsonify({'error': 'No date provided'}), 400
+            return jsonify({'error': 'Chưa chọn ngày'}), 400
         result = manager.get_diary(date)
         return jsonify(result) # result is {'content': ..., 'title': ...}
     except Exception as e:
@@ -387,7 +409,7 @@ def save_diary():
         content = data.get('content')
         title = data.get('title')
         if not date:
-            return jsonify({'error': 'No date provided'}), 400
+            return jsonify({'error': 'Chưa chọn ngày'}), 400
         manager.save_diary(date, content, title)
         socketio.emit('data_updated', {'type': 'diary', 'date': date})
         return jsonify({'success': True})
@@ -402,20 +424,15 @@ def get_diary_history():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/assets', methods=['GET'])
-def get_assets():
-    try:
-        month = request.args.get('month')
-        assets = manager.get_assets(month)
-        return jsonify(assets)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
 @app.route('/api/assets', methods=['GET', 'POST'])
 def handle_assets():
     if request.method == 'GET':
-        return jsonify(manager.storage.get_assets())
+        try:
+            month = request.args.get('month')
+            assets = manager.get_assets(month)
+            return jsonify(assets)
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
     
     # POST - Create new asset
     data = request.json
@@ -434,7 +451,7 @@ def handle_assets():
         if new_id:
             return jsonify({'success': True, 'id': new_id})
         else:
-            return jsonify({'success': False, 'error': 'Asset name already exists'}), 400
+            return jsonify({'success': False, 'error': 'Tên tài sản đã tồn tại'}), 400
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -462,7 +479,7 @@ def handle_asset_item(asset_id):
         if success:
             return jsonify({'success': True})
         else:
-            return jsonify({'success': False, 'error': 'Update failed'}), 400
+            return jsonify({'success': False, 'error': 'Cập nhật thất bại'}), 400
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
         
@@ -558,6 +575,95 @@ def add_account():
              return jsonify({'success': False, 'error': result.stderr}), 500
              
         return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# ========== Financial Goals endpoints ==========
+@app.route('/api/goals', methods=['GET'])
+def get_goals():
+    try:
+        year = request.args.get('year', datetime.now().year, type=int)
+        goals = manager.get_goals(year)
+        return jsonify(goals)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/goals', methods=['POST'])
+def create_goal():
+    data = request.json
+    try:
+        title = data.get('title')
+        target_amount = data.get('target_amount')
+        goal_type = data.get('goal_type', 'custom')
+        year = data.get('year', datetime.now().year)
+        icon = data.get('icon', '🎯')
+        color = data.get('color', '#6366f1')
+        notes = data.get('notes')
+
+        if not title:
+            return jsonify({'success': False, 'error': 'Thiếu tiêu đề mục tiêu'}), 400
+
+        goal_id = manager.storage.add_goal(title, target_amount, goal_type, year, icon, color, notes)
+        socketio.emit('data_updated', {'type': 'goal', 'action': 'add'})
+        return jsonify({'success': True, 'id': goal_id}), 201
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/goals/<int:goal_id>', methods=['PUT'])
+def update_goal(goal_id):
+    data = request.json
+    try:
+        success = manager.storage.update_goal(
+            goal_id,
+            title=data.get('title'),
+            target_amount=data.get('target_amount'),
+            current_amount=data.get('current_amount'),
+            goal_type=data.get('goal_type'),
+            icon=data.get('icon'),
+            color=data.get('color'),
+            notes=data.get('notes')
+        )
+        if success:
+            socketio.emit('data_updated', {'type': 'goal', 'action': 'update'})
+            return jsonify({'success': True})
+        return jsonify({'success': False, 'error': 'Không tìm thấy mục tiêu'}), 404
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/goals/<int:goal_id>', methods=['DELETE'])
+def delete_goal(goal_id):
+    try:
+        success = manager.storage.delete_goal(goal_id)
+        if success:
+            socketio.emit('data_updated', {'type': 'goal', 'action': 'delete'})
+            return jsonify({'success': True})
+        return jsonify({'success': False, 'error': 'Không tìm thấy mục tiêu'}), 404
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/goals/<int:goal_id>/progress', methods=['PATCH'])
+def update_goal_progress(goal_id):
+    data = request.json
+    try:
+        current_amount = data.get('current_amount')
+        if current_amount is None:
+            return jsonify({'success': False, 'error': 'Thiếu số tiền hiện tại'}), 400
+        success = manager.storage.update_goal_progress(goal_id, current_amount)
+        if success:
+            socketio.emit('data_updated', {'type': 'goal', 'action': 'progress'})
+            return jsonify({'success': True})
+        return jsonify({'success': False, 'error': 'Không tìm thấy mục tiêu'}), 404
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/goals/<int:goal_id>/toggle', methods=['PATCH'])
+def toggle_goal_completed(goal_id):
+    try:
+        new_state = manager.storage.toggle_goal_completed(goal_id)
+        if new_state is not None:
+            socketio.emit('data_updated', {'type': 'goal', 'action': 'toggle'})
+            return jsonify({'success': True, 'is_completed': new_state})
+        return jsonify({'success': False, 'error': 'Không tìm thấy mục tiêu'}), 404
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
