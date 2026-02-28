@@ -7,8 +7,10 @@ import os
 import asyncio
 import logging
 import tempfile
+import time
 from datetime import datetime
 from telegram import Update, BotCommand
+from telegram.request import HTTPXRequest
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -51,6 +53,7 @@ def format_vnd(amount: float) -> str:
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /start command"""
+    logger.info(f"Received /start command from {update.effective_user.id}")
     welcome_msg = """
 🎉 *Chào mừng đến Money Tracker Bot!*
 
@@ -104,6 +107,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /balance command"""
+    logger.info(f"Received /balance command from {update.effective_user.id}")
     current_month = datetime.now().strftime("%Y-%m")
     
     # Check for month argument
@@ -220,6 +224,7 @@ async def safe_reply(update: Update, text: str, parse_mode='Markdown'):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle natural language messages for transactions and budgets"""
     text = update.message.text
+    logger.info(f"Received message from {update.effective_user.id}: {text}")
     
     if not text or len(text.strip()) == 0:
         return
@@ -449,17 +454,32 @@ async def post_init(application: Application):
 
 
 def run_bot():
-    """Start the Telegram bot with polling"""
+    """Start the Telegram bot with polling and retry logic"""
     token = os.getenv("TELEGRAM_BOT_TOKEN")
     
     if not token:
         logger.error("TELEGRAM_BOT_TOKEN not found in environment variables!")
         return
+
+    # Ensure there is an event loop in the current thread (important for background threads)
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_closed():
+            raise RuntimeError("Loop is closed")
+    except RuntimeError:
+        logger.info("No event loop found in current thread or loop is closed, creating a new one...")
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
     
-    logger.info("Starting Money Tracker Telegram Bot...")
+    # Increase timeouts for slow connections
+    request = HTTPXRequest(connect_timeout=60, read_timeout=60)
     
     # Create application
-    application = Application.builder().token(token).post_init(post_init).build()
+    application = (Application.builder()
+                  .token(token)
+                  .request(request)
+                  .post_init(post_init)
+                  .build())
     
     # Add handlers
     application.add_handler(CommandHandler("start", start_command))
@@ -476,9 +496,37 @@ def run_bot():
     # Handle voice messages
     application.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, handle_voice))
     
-    # Start polling
-    logger.info("Bot is running! Press Ctrl+C to stop.")
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    # Retry loop for starting the bot
+    max_retries = 5
+    retry_delay = 10
+    
+    for attempt in range(max_retries):
+        try:
+            logger.info(f"Starting Money Tracker Telegram Bot (attempt {attempt+1}/{max_retries})...")
+            # Close loop is false to prevent closing the thread's loop if run_polling exits
+            application.run_polling(allowed_updates=Update.ALL_TYPES, close_loop=False)
+            break
+        except Exception as e:
+            error_msg = str(e)
+            if "Timed out" in error_msg or "Timeout" in error_msg or "network" in error_msg.lower():
+                logger.warning(f"Bot connection issue (timeout/network): {e}. Retrying in {retry_delay}s...")
+                time.sleep(retry_delay)
+            elif "event loop" in error_msg.lower():
+                logger.warning(f"Event loop error detected: {e}. Resetting loop and retrying...")
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                time.sleep(retry_delay)
+            elif "conflict" in error_msg.lower():
+                logger.error("CRITICAL: Another instance of this bot is already running elsewhere!")
+                logger.error("Please close other bot instances or wait a few minutes for Telegram to clear the session.")
+                # We break on conflict because retrying immediately might just keep the conflict going
+                break
+            else:
+                logger.error(f"Telegram bot failed with unexpected error: {e}")
+                if attempt == max_retries - 1:
+                    logger.error("Max retries reached. Bot execution aborted.")
+                    break
+                time.sleep(retry_delay)
 
 
 if __name__ == "__main__":

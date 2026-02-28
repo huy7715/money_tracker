@@ -1971,17 +1971,20 @@ document.addEventListener('DOMContentLoaded', () => {
         let completedCount = 0;
         let totalProgressPct = 0;
 
-        goals.forEach(goal => {
+        goals.forEach((goal, index) => {
             const card = document.createElement('div');
             const color = goal.color || '#6366f1';
             const icon = goal.icon || '🎯';
 
             card.className = `goal-card ${goal.is_completed ? 'completed' : ''}`;
             card.style.setProperty('--goal-color', color);
+            card.style.animationDelay = `${index * 0.1}s`;
 
-            const progress = goal.target_amount > 0
-                ? Math.min(100, Math.round((goal.current_amount / goal.target_amount) * 100))
-                : (goal.is_completed ? 100 : 0);
+            const progress = goal.is_completed ? 100 : (
+                goal.target_amount > 0
+                    ? Math.min(100, Math.round((goal.current_amount / goal.target_amount) * 100))
+                    : 0
+            );
 
             if (goal.is_completed) completedCount++;
             totalProgressPct += progress;
@@ -1996,7 +1999,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="goal-progress-section">
                     <div class="goal-progress-text">
-                        <span>${formatGoalAmount(goal.current_amount)} / ${formatGoalAmount(goal.target_amount)}</span>
+                        <span>${formatGoalAmount(goal.is_completed ? Math.max(goal.current_amount || 0, goal.target_amount || 0) : goal.current_amount)} / ${formatGoalAmount(goal.target_amount)}</span>
                         <span>${progress}%</span>
                     </div>
                     <div class="goal-progress-mini">
@@ -2273,19 +2276,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Nav Scroll
-    if (EL.goalPrevBtn && EL.goalsTrack) {
-        EL.goalPrevBtn.addEventListener('click', () => {
-            EL.goalsTrack.scrollBy({ left: -300, behavior: 'smooth' });
-        });
-    }
-    if (EL.goalNextBtn && EL.goalsTrack) {
-        EL.goalNextBtn.addEventListener('click', () => {
-            EL.goalsTrack.scrollBy({ left: 300, behavior: 'smooth' });
-        });
-    }
-
-    // Nav Scroll
     if (EL.goalPrevBtn && EL.goalsTrack) {
         EL.goalPrevBtn.addEventListener('click', () => {
             EL.goalsTrack.scrollBy({ left: -300, behavior: 'smooth' });

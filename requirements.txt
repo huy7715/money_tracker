@@ -5,4 +5,3 @@ python-dotenv
 gunicorn
 flask-socketio
 python-telegram-bot
-psycopg2-binary

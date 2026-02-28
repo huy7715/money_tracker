@@ -3,6 +3,7 @@ from flask_socketio import SocketIO, emit
 import csv
 import io
 from money_tracker.backend.manager import FinanceManager
+from money_tracker.backend.ai_service import AIService
 import os
 import subprocess
 import json
@@ -11,32 +12,17 @@ import sys
 import threading
 
 app = Flask(__name__)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
-# Conditional SocketIO (Disabled on Vercel/Cloud to avoid serverless errors)
-is_vercel = os.environ.get('VERCEL') == '1' or os.environ.get('DISABLE_SOCKETIO') == '1'
-if is_vercel:
-    print("App: WebSockets (SocketIO) DISABLED for Cloud/Serverless environment")
-    from flask_socketio import SocketIO
-    # Create a dummy SocketIO that doesn't attempt real connections
-    class MockSocketIO:
-        def emit(self, *args, **kwargs): pass
-        def on(self, *args, **kwargs): return lambda x: x
-        def init_app(self, app, *args, **kwargs): pass
-    socketio = MockSocketIO()
-else:
-    socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading' if os.name == 'nt' else 'eventlet')
-
-# Database Initialization
-# If DATABASE_URL is set, Storage will use PostgreSQL. Default to local money_tracker.db.
-db_path = 'money_tracker.db'
+# Determine database path: works for both dev (.py) and frozen (.exe)
 if getattr(sys, 'frozen', False):
-    db_path = os.path.join(os.path.dirname(sys.executable), 'money_tracker.db')
-elif not os.environ.get('DATABASE_URL'):
-    # Local pathing if no PG URL
+    # Running as PyInstaller .exe — DB sits next to the .exe
+    root_dir = os.path.dirname(sys.executable)
+else:
+    # Running as .py script — DB sits at project root
     root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    db_path = os.path.join(root_dir, 'money_tracker.db')
 
-manager = FinanceManager(db_path=db_path)
+manager = FinanceManager(db_path=os.path.join(root_dir, 'money_tracker.db'))
 
 # Singleton AI Service (avoid re-creating per request)
 _ai_service = None
